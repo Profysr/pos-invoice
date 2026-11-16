@@ -1,227 +1,361 @@
 # Invoice Generator — implementation plan
 
-## Decision
+## Current status
 
-- **Desktop shell:** Electron
-- **Frontend:** React 19 + JavaScript (JSX)
-- **Build tooling:** Vite + electron-vite
-- **Local database:** SQLite via Node's built-in `node:sqlite` API
-- **Target:** Windows 10/11
-- **Printer language:** ESC/POS
-- **First paper size:** 80 mm; receipt layout will use a configurable character width so 58 mm can be enabled later
+- **Plan revised:** 2026-11-17
+- **Implementation status:** Not started
+- **Approval rule:** Each phase requires explicit user approval before any implementation work begins. A general approval does not automatically approve later phases.
 
-Electron is the quickest option here because the machine already has Node.js/npm, Rust is not installed, and the UI, database, printer integration, and Windows packaging can all use JavaScript. Electron 45 includes Node.js 24, whose built-in `node:sqlite` module removes the need for a native SQLite package or rebuild step.
+## Direction
+
+Build a small, purpose-built invoice application from scratch. Do not use the upstream Receipt Studio UI or ship it as a fork.
+
+Use [Receipt Studio](https://github.com/Ytosko/Receipt-Studio) only as a reviewed source for the printing and receipt-rendering implementation that is difficult to recreate safely.
+
+### Stack
+
+- Electron 45
+- React 19 with JavaScript/JSX
+- Vite with `electron-vite`
+- SQLite through Electron's built-in `node:sqlite`
+- Plain CSS; no UI framework
+- Windows 10/11 x64
+- ESC/POS receipt output
+
+### Confirmed decisions
+
+- Keep the original plan's SQLite persistence.
+- Do not include PDF export, QR generation, barcode generation, cash-drawer support, authentication, cloud sync, or currency conversion.
+- Company metadata is global and shared by every invoice.
+- The application UI is custom and much simpler than Receipt Studio.
+- Do not add `node-thermal-printer`; use the smaller encoder pattern already implemented by Receipt Studio.
+- Use `iconv-lite` for receipt character encoding.
+- Keep the upstream MIT license and attribution for all ported source.
+
+## Receipt Studio source review
+
+Source inspected at upstream commit `8e758eb0d129523a334bfb23953090ed216f7521` (v1.3.5).
+
+The following implementation may be ported and adapted:
+
+| Upstream source | Reuse |
+| --- | --- |
+| `src/main/printing/escpos.ts` | ESC/POS initialization, character encoding, alignment, bold/underline, text wrapping, columns, dividers, raster images, and cut command |
+| `src/main/printing/printer.ts` | Raw TCP LAN printing, socket timeout, and clear connection/write errors |
+| `src/main/receipt/render.ts` | Canonical receipt-line model and width-aware wrapping shared by preview and output |
+| `src/main/main.ts` (`renderWithAssets`, `printLines`) | Logo rasterization and Windows installed-printer printing through Electron |
+| `shared/money.ts` | Integer minor-unit money calculations and formatting |
+| `shared/schemas.ts` (`printerSchema`) | Printer profiles for paper width, printable width, character width, encoding, timeout, and cut behavior |
+| `tests/unit/receipt.test.ts` | Test cases to adapt for the new invoice receipt model |
+
+Do **not** port:
+
+- POS navigation, dashboard, products, stock, loyalty, refunds, replacements, payment methods, labels, barcode scanners, or multi-shop management
+- Upstream JSON repository; this project keeps SQLite
+- PDF and QR output
+- Cash-drawer commands
+- Upstream styling and page design
 
 ## Application scope for version 1
 
-### Main screen
+### Sidebar
 
-A single desktop window with two columns:
+A small persistent sidebar with:
+
+- **New Invoice**
+- **Saved Invoices**
+- **Company Metadata** button that opens the company metadata modal
+
+### Company metadata modal
+
+Opened from the sidebar and persisted for use by every invoice:
+
+- Company name
+- Address
+- Phone
+- Email
+- Logo upload (PNG/JPEG)
+- Default currency
+
+Company details are not repeated in the invoice form.
+
+### Main page
+
+One page with a compact toolbar and two columns:
 
 1. **Invoice form**
-   - Business/company details
+   - Invoice number/ID
    - Customer/destination details
    - Date and time
-   - Product/service line items (description, quantity, unit price)
-   - Shipping service, destination address, package weight, expected delivery date
+   - Product/service line items: description, quantity, unit price
+   - Shipping service
+   - Destination address
+   - Package weight
+   - Expected delivery date
    - Tracking number
    - Optional insurance amount
-   - Currency (USD by default)
+   - Currency
    - Terms/support/tracking instructions for the footer
 2. **Live receipt preview**
-   - Proportional to 80 mm paper
-   - Shows logo, header, transaction details, item table, shipping/tracking, totals, and footer
+   - Proportional to the selected paper width
+   - Logo, company header, invoice/customer details, items, shipping/tracking, totals, and footer
    - Updates immediately as the form changes
 
-A compact toolbar will provide:
+Toolbar actions:
 
 - Save invoice
 - New/clear invoice
 - Print
-- Settings
+- Printer settings
 
-### Settings
+### Printer settings
 
-A small settings modal/panel will persist in SQLite:
+- LAN TCP or installed Windows printer
+- LAN host/IP and port (default `9100`)
+- Installed Windows printer name
+- Paper width: 58 mm or 80 mm
+- Printable width and character width
+- Receipt encoding
+- Feed lines and cut after print
 
-- Company name, address, phone, email
-- Logo upload (PNG/JPEG)
-- Default currency and paper width
-- Printer connection: LAN TCP or Windows installed printer queue
-- LAN printer IP address and port (default `9100`)
-- Installed Windows printer name for USB/queue printing
+### Saved invoices
 
-### Data persisted in SQLite
+- Save, list, load, and delete invoices
+- Persist invoice header, line items, totals, shipping/tracking details, and print status
+- Persist global company metadata, logo metadata, and printer preferences
 
-- Business profile and logo metadata
-- Printer preferences
-- Saved invoices and their line items
-- Invoice number, timestamps, totals, and shipping/tracking details
+### Money rules
 
-Version 1 will not include authentication, cloud sync, PDF export, QR/barcode generation, multi-currency conversion, or a cash-drawer workflow.
-
-## Receipt/output rules
-
-The same invoice data will drive both the on-screen preview and ESC/POS output. Totals will be calculated from integer cents to avoid floating-point money errors:
+All money is stored and calculated as integer minor units:
 
 - Item total = quantity × unit price
 - Subtotal = sum of item totals
-- Insurance is optional
-- Grand total = subtotal + insurance (plus shipping amount only if the final receipt template requires it)
-
-The shared receipt template will later be replaced with the supplied reference template without changing the invoice form or database.
+- Grand total = subtotal + optional insurance
+- Shipping service information is informational in version 1 and does not change the total unless a shipping-charge field is explicitly approved later
 
 ## Printing strategy
 
-### 1. LAN printer (implemented first)
+### LAN printer
 
-Both named printers support USB + LAN. LAN is the simplest and most reliable first path:
+Port and adapt Receipt Studio's raw TCP printer:
 
-- Open a raw TCP connection to the printer IP
-- Send ESC/POS bytes directly, commonly on port `9100`
+- Connect to the printer host and port, normally `9100`
 - Apply a connection timeout
-- Report a clear error when the printer is offline, unreachable, or out of paper
+- Send the generated ESC/POS byte buffer
+- Report unreachable, timeout, and write failures clearly
+- A successful socket write means bytes were delivered; it does not guarantee physical output
 
-### 2. USB through the Windows print queue
+### Windows installed printer
 
-For USB, the app sends the same ESC/POS byte buffer to the printer installed in Windows. This avoids replacing the printer driver with Zadig/WinUSB, which can break normal printing.
+Use Receipt Studio's Electron system-print path:
 
-The first implementation will use a tiny Windows PowerShell helper backed by the standard `winspool` API (`OpenPrinter`/`WritePrinter`). It runs only for USB/queue printing; it does not add a native Node module and does not alter the installed printer driver.
+- Render the canonical receipt lines as paper-width HTML
+- Print through `webContents.print` to the selected installed Windows printer
+- Do not add the previously proposed PowerShell/`winspool` helper
 
-## Files to create
+The installed-printer path is not raw ESC/POS. Logo, cut, and exact thermal formatting depend on the installed printer driver. If the BC86AC or SNC-830 requires raw ESC/POS through USB/Windows, stop after physical verification and ask before adding a second printing path.
+
+## Planned project structure
 
 ```text
 invoice-gen/
 ├─ package.json
 ├─ electron.vite.config.mjs
 ├─ index.html
+├─ LICENSE
+├─ THIRD_PARTY_NOTICES.md
 ├─ src/
 │  ├─ main/
 │  │  ├─ index.js
 │  │  ├─ database.js
 │  │  ├─ settings.js
 │  │  └─ printer.js
-│  ├─ scripts/
-│  │  └─ print-raw.ps1
-│  │  
 │  ├─ preload/
 │  │  └─ index.js
 │  ├─ renderer/
-│     ├─ src/
-│     │  ├─ main.jsx
-│     │  ├─ App.jsx
-│     │  ├─ styles.css
-│     │  ├─ components/
-│     │  │  ├─ InvoiceForm.jsx
-│     │  │  ├─ ReceiptPreview.jsx
-│     │  │  └─ SettingsDialog.jsx
-│     │  └─ lib/
-│     │     ├─ invoice.js
-│     │     └─ receipt.js
-│     └─ index.html
-└─ resources/
-   └─ icon.png
+│  │  ├─ index.html
+│  │  └─ src/
+│  │     ├─ main.jsx
+│  │     ├─ App.jsx
+│  │     ├─ styles.css
+│  │     ├─ components/
+│  │     │  ├─ Sidebar.jsx
+│  │     │  ├─ CompanyMetadataDialog.jsx
+│  │     │  ├─ PrinterSettingsDialog.jsx
+│  │     │  ├─ InvoiceForm.jsx
+│  │     │  └─ ReceiptPreview.jsx
+│  └─ shared/
+│     ├─ invoice.js
+│     └─ receipt.js
+├─ resources/
+│  └─ icon.png
+└─ tests/
+   ├─ invoice.test.js
+   └─ receipt.test.js
 ```
 
-## Implementation phases
+`src/shared/receipt.js` is the single canonical receipt formatter. The renderer preview and main-process printer consume the same receipt-line model.
 
-### Phase 1 — Scaffold and database
+## Command-only environment and setup rules
 
-- Create the Electron/React JavaScript project
-- Install runtime and development packages
-- Add secure Electron defaults: context isolation on, Node integration off, preload bridge only
-- Create SQLite schema and migrations in `src/main/database.js` using `node:sqlite`
-- Implement settings, invoice save/list/load/delete IPC methods
-- Verify the installed Electron version can import `node:sqlite` before building the schema
+- Install all packages with `npm install` or `npm ci`; do not manually download package archives or installers.
+- Install and run Electron, Vite, tests, and packaging through project scripts; do not manually install application files.
+- Run setup and verification commands from the project root.
+- If a command requires administrator approval, GitHub authentication, a vendor printer driver, physical printer access, or another action only the user can perform, stop and ask the user for that specific help.
+- Do not tell the user to perform broad manual setup when a command can do it.
+- If any requirement is unclear, ask the smallest possible clarifying question immediately and stop that phase. Do not guess.
 
-### Phase 2 — UI and invoice model
+### Initial package commands
 
-- Build the two-column responsive layout
-- Add controlled form state and line-item add/remove/update
-- Calculate totals in integer cents
-- Add the live 80 mm receipt preview
-- Add company profile and logo upload
-- Add a compact settings dialog
-
-### Phase 3 — ESC/POS output
-
-- Build a shared receipt formatter
-- Generate text/table/separator/cut commands
-- Add a “save receipt as text/commands” debug action for easier hardware testing
-- Implement LAN TCP printing with timeout and actionable errors
-- Implement Windows queue printing for USB
-- Add print success/failure feedback
-
-### Phase 4 — Tests and packaging
-
-- Add focused Node test-runner tests for money totals and receipt line formatting
-- Verify save → reload → print data consistency
-- Build a Windows NSIS installer with `electron-builder`
-- Test on the BC86AC and SNC-830 over LAN and USB
-
-## Technical note: JavaScript-only SQLite
-
-The installed Electron 45 release uses Node.js 24.22.3, which includes `node:sqlite`. The app will therefore use SQLite directly through the standard Node API:
-
-```js
-import { DatabaseSync } from 'node:sqlite'
-```
-
-This avoids `better-sqlite3`, native compilation, ABI rebuilds, and an extra runtime dependency. The API is currently marked release-candidate by Node, but it is suitable for this local single-user application and can be replaced later behind `src/main/database.js` if needed.
-
-## Physical printer test checklist
-
-- 80 mm alignment and margins
-- Long item descriptions and wrapping
-- Logo quality/size
-- Latin punctuation and currency formatting
-- Full/partial cut behavior
-- Printer offline, timeout, paper-out, and reconnect errors
-- Same receipt over LAN and USB
-- 58 mm adaptation once enabled
-
-## Manual commands
-
-Do not run these until the plan is approved.
-
-### 1. Create the project files manually
-
-Create the folders and files listed above in `invoice-gen`, or ask me to generate the plain JavaScript files one by one. The commands below assume `package.json` and the source files already exist.
-
-### 2. Install dependencies
+These run only after Phase 1 is approved:
 
 ```powershell
-cd C:\Users\mprof\OneDrive\Desktop\invoice-gen
-npm install
+Set-Location 'C:\Users\mprof\OneDrive\Desktop\invoice-gen'
+npm init -y
+npm install react@19 react-dom@19 zod@4 iconv-lite
+npm install -D electron@45 electron-vite vite @vitejs/plugin-react electron-builder
 ```
 
-SQLite uses Electron's built-in `node:sqlite` module, so there is no native module rebuild step.
+After `package-lock.json` exists, repeatable installs use:
 
-### 3. Start development mode
+```powershell
+npm ci
+```
+
+### Reference-source command
+
+Do not add the upstream application as a dependency. Keep a temporary reference clone for source comparison and attribution:
+
+```powershell
+$Reference = Join-Path $env:TEMP 'Receipt-Studio-reference'
+if (-not (Test-Path -LiteralPath $Reference)) {
+  git clone --depth 1 https://github.com/Ytosko/Receipt-Studio.git $Reference
+} else {
+  git -C $Reference pull --ff-only
+}
+git -C $Reference rev-parse HEAD
+```
+
+### Development and verification commands
 
 ```powershell
 npm run dev
-```
-
-### 4. Run checks
-
-```powershell
 npm test
 npm run build
-```
-
-### 5. Build the Windows installer
-
-```powershell
 npm run dist
 ```
 
-The installer will be written under:
+`npm run dist` must create an NSIS installer and portable executable under `release/`.
 
-```text
-release/
-```
+## Implementation phases
 
-## Approval status
+Each phase starts only after the user explicitly approves that phase.
 
-**Approved on 2026-11-17.** JavaScript project files and manual commands will be supplied in phases.
+### Phase 0 — Validate the source and plan
+
+- Preserve the inspected upstream commit and license information
+- Confirm which receipt-rendering and printing portions will be ported
+- Resolve any remaining invoice-numbering or final-template ambiguity with one focused question
+
+**Done when:** The user approves the revised plan and the numbered phases.
+
+### Phase 1 — Scaffold the application
+
+- Create the minimal Electron/React project structure
+- Configure `electron-vite`
+- Install packages with the commands above
+- Add `dev`, `test`, `build`, and `dist` scripts
+- Launch a minimal secure window
+
+**Verify:** `npm run dev` opens the application; `npm run build` succeeds.
+
+### Phase 2 — Secure shell and SQLite foundation
+
+- Enable context isolation, disable renderer Node integration, and expose only required preload APIs
+- Create SQLite schema and migrations in `src/main/database.js`
+- Create tables for settings, company metadata, printer profiles, invoices, and invoice items
+- Store the uploaded logo as an app-data file and save only its metadata in SQLite
+
+**Verify:** Database tests cover create, update, reload, and delete operations.
+
+### Phase 3 — Sidebar, company metadata, and printer settings
+
+- Build the small sidebar
+- Add the Company Metadata modal and persist its values
+- Add the Printer Settings modal and persist printer preferences
+- Add logo upload and preview
+
+**Verify:** Close and reopen the app; company metadata and printer settings remain available.
+
+### Phase 4 — Invoice form and totals
+
+- Build the controlled invoice form and line-item editing
+- Calculate and display subtotal, insurance, and grand total using integer minor units
+- Validate required invoice data at save/print boundaries
+
+**Verify:** Focused tests cover item totals, subtotal, insurance, and grand total.
+
+### Phase 5 — Shared receipt formatter and live preview
+
+- Port the useful receipt-line behavior into `src/shared/receipt.js`
+- Add width-aware wrapping, columns, separators, footer, and totals
+- Build the live receipt preview from the same receipt-line model
+- Support 58 mm and 80 mm preview widths
+
+**Verify:** Editing form fields immediately updates the preview; receipt formatting tests pass.
+
+### Phase 6 — Save, load, and delete invoices
+
+- Implement invoice and line-item persistence
+- Add Saved Invoices navigation, list, load, and delete actions
+- Preserve company metadata and printer settings separately
+
+**Verify:** Save → restart/reload → load produces identical invoice data and totals.
+
+### Phase 7 — LAN ESC/POS printing
+
+- Port the upstream ESC/POS encoder without QR or cash-drawer behavior
+- Port the raw TCP sender and timeout handling
+- Generate the ESC/POS buffer from the canonical receipt model
+- Add print success/failure feedback
+
+**Verify:** Automated byte tests pass; physical LAN print is tested on the BC86AC and SNC-830.
+
+### Phase 8 — Windows installed-printer printing
+
+- Add installed-printer discovery/selection
+- Render and print through Electron's Windows system-print path
+- Verify paper width, margins, logo, text wrapping, and total alignment
+
+**Verify:** The same invoice prints through the selected installed Windows printer. Any driver limitation is documented before changing the approach.
+
+### Phase 9 — Tests, packaging, and final hardware checks
+
+- Run all automated checks
+- Build the NSIS installer and portable executable
+- Complete the physical printer checklist
+- Update this plan with the final verified versions and known limitations
+
+**Verify:** `npm test`, `npm run build`, and `npm run dist` succeed; both printers pass the agreed physical checks.
+
+## Approval protocol
+
+Before every phase, the assistant must:
+
+1. State the exact scope, files, and commands for that phase.
+2. Ask the user to approve that phase.
+3. Wait for an explicit approval.
+4. Stop and update the plan if the user changes the scope.
+
+No phase may be implemented early, even if a later phase was discussed or approved.
+
+## Physical printer test checklist
+
+- 58 mm and 80 mm alignment and margins
+- Long item descriptions and wrapping
+- Logo quality and size
+- Currency and punctuation
+- Full/partial cut behavior on ESC/POS LAN output
+- Printer offline, timeout, reconnect, and physical-output limitations
+- Same invoice through LAN and installed Windows printer
+- Save → reload → print data consistency
