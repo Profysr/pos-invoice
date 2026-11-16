@@ -19,7 +19,7 @@ Use [Receipt Studio](https://github.com/Ytosko/Receipt-Studio) only as a reviewe
 - React 19 with JavaScript/JSX only
 - Vite with the official `electron-vite` React scaffold
 - Mantine for application UI components and Tabler Icons
-- Mantine Form / React Hook Form with Zod validation
+- Mantine Form with its built-in validators
 - SQLite through Electron's built-in `node:sqlite`
 - Minimal custom CSS, mainly for the dedicated thermal receipt preview
 - npm as the only package manager
@@ -32,7 +32,7 @@ Use [Receipt Studio](https://github.com/Ytosko/Receipt-Studio) only as a reviewe
 - Use JavaScript/JSX, not TypeScript.
 - Use npm and `package-lock.json`; do not use pnpm or create a pnpm lockfile.
 - Use the official Electron installation scaffold rather than creating the Electron architecture from an empty folder.
-- Use Mantine instead of implementing standard buttons, inputs, modals, tables, notifications, date controls, and layouts from scratch.
+- Use Mantine instead of implementing standard buttons, inputs, modals, tables, notifications, and layouts from scratch; use native date and time inputs.
 - Start with React state. Do not install Zustand unless React state becomes a demonstrated problem.
 - Use Mantine's Table for saved invoices initially. Do not install TanStack Table unless a real requirement appears.
 - Do not include PDF export, QR generation, barcode generation, cash-drawer support, authentication, cloud sync, or currency conversion.
@@ -293,7 +293,7 @@ Set-Location '.\app'
 
 # If the scaffold asks: React, JavaScript, no updater, no download mirror.
 npm install
-npm install @mantine/core @mantine/hooks @mantine/form @mantine/dates @mantine/notifications @tabler/icons-react @hookform/resolvers react-hook-form dayjs iconv-lite zod
+npm install @mantine/core @mantine/hooks @mantine/form @mantine/notifications @tabler/icons-react iconv-lite
 npm install -D electron@45 electron-builder
 ```
 
@@ -345,7 +345,7 @@ Each phase starts only after the user explicitly approves that phase. Before eac
 
 - Run the preferred npm scaffold command
 - Keep the React JavaScript template; remove TypeScript configuration and examples
-- Install Mantine, Tabler Icons, React Hook Form, Zod, and `iconv-lite`
+- Install Mantine, Tabler Icons, and `iconv-lite`
 - Install Electron 45 and `electron-builder`
 - Remove starter demos, updater functionality, and unused styling/plugins
 - Add `dev`, `test`, `build`, and `dist` scripts
@@ -376,7 +376,7 @@ Each phase starts only after the user explicitly approves that phase. Before eac
 
 ### Phase 4 — Invoice form and totals
 
-- Build the invoice form with Mantine Form / React Hook Form and Zod validation
+- Build the invoice form with Mantine Form and its built-in validators
 - Build line-item editing with Mantine inputs and table controls
 - Calculate and display subtotal, insurance, and grand total using integer minor units
 - Use scaled integer quantities with explicit rounding

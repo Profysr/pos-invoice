@@ -19,14 +19,22 @@
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
-    "@electron-toolkit/utils": "^4.0.0"
+    "@electron-toolkit/utils": "^4.0.0",
+    "@mantine/core": "^9.8.1",
+    "@mantine/dates": "^9.8.1",
+    "@mantine/form": "^9.8.1",
+    "@mantine/hooks": "^9.8.1",
+    "@mantine/notifications": "^9.8.1",
+    "@tabler/icons-react": "^3.52.0",
+    "dayjs": "^1.11.23",
+    "iconv-lite": "^0.7.3"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config": "^3.0.0",
     "@electron-toolkit/eslint-config-prettier": "^3.0.1",
     "@vitejs/plugin-react": "^6.1.2",
-    "electron": "^44.7.2",
-    "electron-builder": "^26.15.3",
+    "electron": "^45.3.3",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.5",
