@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { NavLink } from '@mantine/core'
-import { IconFileInvoice, IconHistory, IconSettings } from '@tabler/icons-react'
+import { IconFileInvoice, /* IconHistory, */ IconSettings } from '@tabler/icons-react'
 
 const navItems = [
   { id: 'new-invoice', label: 'New Invoice', icon: IconFileInvoice },
-  { id: 'history', label: 'History', icon: IconHistory },
+  // { id: 'history', label: 'History', icon: IconHistory }, // temporarily disabled
   { id: 'settings', label: 'Settings', icon: IconSettings }
 ]
 

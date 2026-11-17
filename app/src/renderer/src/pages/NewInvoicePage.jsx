@@ -12,10 +12,7 @@ import {
   mockReceiptLines
 } from '../mockData.js'
 
-// MOCK: draft values and receipt formatting move behind IPC once the
-// persistence and receipt-formatter cards land. No business calculations
-// are performed in this page — line totals and receiptLines are mock
-// helpers from mockData.js standing in for the backend.
+// MOCK: draft values and receipt formatting move behind IPC once the persistence and receipt-formatter cards land. No business calculations are performed in this page — line totals and receiptLines are mock helpers from mockData.js standing in for the backend.
 function NewInvoicePage() {
   const form = useForm({
     mode: 'uncontrolled',

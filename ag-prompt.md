@@ -24,10 +24,9 @@ The design must feel practical, organized and polished.
 - Dark charcoal text.
 - Subtle grey borders.
 - One restrained accent color for primary actions.
-- Red for destructive actions and green for successful statuses.
 - Consistent typography, spacing and alignment.
 - Compact buttons, inputs, tables and modals.
-- Subtle corner rounding.
+- Subtle corner rounding of 5px.
 
 **Strictly avoid:**
 
