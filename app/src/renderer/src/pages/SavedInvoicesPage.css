@@ -1,0 +1,12 @@
+.saved-invoices-panel {
+  background: var(--mantine-color-body);
+}
+
+.saved-invoices-search {
+  max-width: 280px;
+  flex: 1;
+}
+
+.saved-invoices-number {
+  font-variant-numeric: tabular-nums;
+}
