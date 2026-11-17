@@ -3,9 +3,18 @@
 ## Current status
 
 - **Plan revised:** 2026-11-17
-- **Implementation status:** Not started
+- **Implementation status:** Phases 0–2 complete; Phase 3 awaits explicit approval
 - **Approval rule:** Each phase requires explicit user approval before any implementation work begins. A general approval does not automatically approve later phases.
 - **Implementation discipline:** Ponytail full mode applies to every phase.
+
+### Completed implementation record
+
+- Electron 45.3.3 with Node.js 24.22.3, React 19.3.1, Vite 8.3.8, electron-vite 6.0.0, and Mantine 9.8.1 are installed through npm.
+- `npm ci` completes successfully and `npm ls --depth=0` reports no missing or invalid packages; `npm audit --omit=dev` reports zero runtime vulnerabilities.
+- The development-only `electron-builder` dependency chain currently reports six moderate `minimatch` advisories with no non-breaking upstream fix; review during packaging rather than applying npm's forced downgrade.
+- The renderer runs with context isolation and sandboxing enabled, Node integration disabled, navigation blocked, and a narrow preload API.
+- SQLite schema version 1 includes settings, company metadata, printer profiles, invoices, invoice items, and print history under Electron's `userData` path.
+- Focused database tests, lint, production build, and an Electron launch smoke test pass.
 
 ## Direction
 
@@ -332,7 +341,7 @@ npm run dist
 
 Each phase starts only after the user explicitly approves that phase. Before each phase, the agent must reread the Ponytail guidelines and state the exact scope, affected files, and commands.
 
-### Phase 0 — Validate the source and plan
+### Phase 0 — Validate the source and plan — Complete
 
 - Preserve the inspected upstream commit and license information
 - Confirm which receipt-rendering and printing portions will be ported
@@ -341,7 +350,7 @@ Each phase starts only after the user explicitly approves that phase. Before eac
 
 **Done when:** The user approves the revised plan and numbered phases.
 
-### Phase 1 — Install the official Electron scaffold
+### Phase 1 — Install the official Electron scaffold — Complete
 
 - Run the preferred npm scaffold command
 - Keep the React JavaScript template; remove TypeScript configuration and examples
@@ -353,7 +362,7 @@ Each phase starts only after the user explicitly approves that phase. Before eac
 
 **Verify:** `npm run dev` opens the application; `npm run build` succeeds.
 
-### Phase 2 — Secure shell and SQLite foundation
+### Phase 2 — Secure shell and SQLite foundation — Complete
 
 - Enable context isolation and renderer sandboxing, disable renderer Node integration, and expose only required preload APIs
 - Create SQLite schema and versioned migrations in `src/main/database.js`
