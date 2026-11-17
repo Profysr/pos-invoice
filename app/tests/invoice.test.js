@@ -7,7 +7,8 @@ import {
   formatQuantityMilli,
   normalizeInvoiceDraft,
   parseMoneyToMinorUnits,
-  parseQuantityToMilli
+  parseQuantityToMilli,
+  storedInvoiceToDraft
 } from '../src/shared/invoice.js'
 
 test('parses money into integer minor units', () => {
@@ -101,4 +102,38 @@ test('rejects incomplete invoice drafts', () => {
       ),
     /Customer name|Invoice number|at least one/
   )
+})
+
+test('round-trips a stored invoice back into draft values', () => {
+  const original = normalizeInvoiceDraft(
+    {
+      invoiceNumber: 'INV-2026-0007',
+      invoiceDate: '2026-11-17',
+      invoiceTime: '10:30',
+      customerName: 'Bilal Ahmad',
+      customerPhone: '+92 300',
+      customerAddress: 'Lahore',
+      currency: 'PKR',
+      insurance: '25.00',
+      shippingService: 'TCS',
+      destinationAddress: 'Islamabad',
+      packageWeight: '2.5 kg',
+      expectedDeliveryDate: '2026-11-18',
+      trackingNumber: 'TRACK-9',
+      notes: 'Handle carefully',
+      items: [
+        { id: 'item-1', description: 'LED bulb', qty: '4', unitPrice: '450.00' },
+        { id: 'item-2', description: 'Cord', qty: '1.05', unitPrice: '1250' },
+        { id: 'item-3', description: 'Free sample', qty: '1', unitPrice: '0' }
+      ]
+    },
+    'invoice-7'
+  )
+
+  const stored = { ...original.invoice, items: original.items }
+  const roundTripped = normalizeInvoiceDraft(storedInvoiceToDraft(stored), 'invoice-7')
+
+  assert.deepEqual(roundTripped.invoice, original.invoice)
+  assert.deepEqual(roundTripped.items, original.items)
+  assert.throws(() => storedInvoiceToDraft({ ...stored, items: [] }), /no line items/)
 })

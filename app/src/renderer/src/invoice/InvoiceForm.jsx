@@ -15,6 +15,7 @@ import { formatMoney } from '../../../shared/invoice.js'
 
 function InvoiceForm({
   form,
+  title = 'New invoice',
   onPrint,
   printing = false,
   lineItemsSlot,
@@ -29,7 +30,7 @@ function InvoiceForm({
     >
       <Group justify="space-between" align="flex-start" gap="sm" mb="sm" wrap="nowrap">
         <div>
-          <Title order={3}>New invoice</Title>
+          <Title order={3}>{title}</Title>
           <Text size="xs" c="dimmed">
             Review the receipt preview, then print.
           </Text>

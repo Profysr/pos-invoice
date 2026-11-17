@@ -12,7 +12,8 @@ import {
   formatMoney,
   normalizeInvoiceDraft,
   parseMoneyToMinorUnits,
-  parseQuantityToMilli
+  parseQuantityToMilli,
+  storedInvoiceToDraft
 } from '../../../shared/invoice.js'
 import { buildReceiptLines } from '../../../shared/receipt.js'
 
@@ -65,10 +66,14 @@ function safeQuantity(value) {
   }
 }
 
-function NewInvoiceEditor({ bootstrap }) {
+function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
+  const initialValues = editInvoice?.items?.length
+    ? { ...createInitialValues(bootstrap), ...storedInvoiceToDraft(editInvoice) }
+    : createInitialValues(bootstrap)
+
   const form = useForm({
     mode: 'uncontrolled',
-    initialValues: createInitialValues(bootstrap),
+    initialValues,
     validate: {
       customerName: (value) => (value.trim().length > 0 ? null : 'Customer name is required'),
       invoiceNumber: (value) => (value.trim().length > 0 ? null : 'Invoice number is required'),
@@ -77,7 +82,7 @@ function NewInvoiceEditor({ bootstrap }) {
       currency: (value) => (/^[A-Za-z]{3}$/.test(value.trim()) ? null : 'Use a three-letter currency code')
     }
   })
-  const [invoiceId, setInvoiceId] = useState(createId)
+  const [invoiceId, setInvoiceId] = useState(() => editInvoice?.id ?? createId())
   const [printing, setPrinting] = useState(false)
 
   const rows = useMemo(() => form.values.items ?? [], [form.values])
@@ -243,6 +248,7 @@ function NewInvoiceEditor({ bootstrap }) {
       >
         <InvoiceForm
           form={form}
+          title={editInvoice ? 'Edit invoice' : 'New invoice'}
           onPrint={handlePrint}
           printing={printing}
           lineItemsSlot={lineItemsSlot}
@@ -264,7 +270,7 @@ function NewInvoiceEditor({ bootstrap }) {
   )
 }
 
-function NewInvoicePage() {
+function NewInvoicePage({ editInvoice = null }) {
   const [bootstrap, setBootstrap] = useState(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
@@ -320,7 +326,13 @@ function NewInvoicePage() {
     )
   }
 
-  return <NewInvoiceEditor key={`${bootstrap.invoiceNumber}-${attempt}`} bootstrap={bootstrap} />
+  return (
+    <NewInvoiceEditor
+      key={`${bootstrap.invoiceNumber}-${attempt}-${editInvoice?.id ?? 'new'}`}
+      bootstrap={bootstrap}
+      editInvoice={editInvoice}
+    />
+  )
 }
 
 export default NewInvoicePage

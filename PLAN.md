@@ -3,7 +3,7 @@
 ## Current status
 
 - **Plan revised:** 2026-11-17
-- **Implementation status:** Phases 0–5 and the narrowed Phase 7/8 printing scope complete (New Invoice + settings + both printer paths); Saved Invoices/History (Phase 6 table UI) deferred; Phase 9 packaging and physical hardware checks remain
+- **Implementation status:** Phases 0–8 complete (New Invoice, settings, Saved Invoices with View/Edit/Delete/Print, both printer paths); Phase 9 automated checks and packaging complete — only the physical printer checklist remains
 - **Approval rule:** Each phase requires explicit user approval before any implementation work begins. A general approval does not automatically approve later phases.
 - **Implementation discipline:** Ponytail full mode applies to every phase.
 
@@ -21,8 +21,11 @@
 - Receipt Studio (commit `8e758eb0d129523a334bfb23953090ed216f7521`) code is ported: ESC/POS encoder and text sanitization (`src/main/printing.js`), raw TCP LAN sender with timeout/error handling, receipt wrapping/columns, money formatting, and the hidden-window Windows system-print path (`src/main/system-print.js`).
 - Settings modal persists company metadata (with logo choose/remove/preview) and printer profile (network ESC/POS TCP or Windows installed printer, paper/character widths, encoding, cut/feed, timeout) to SQLite.
 - Print flow records status (`printing` → `succeeded`/`failed`) and a print-history row; a TCP write success is reported as bytes delivered, not guaranteed physical output.
-- Verification on 2026-11-17: `npm test` 16/16 pass, `npm run lint` 0 errors (remaining warnings are pre-existing CRLF/prettier notices), `npm run build` succeeds, and the Electron smoke test reports `SMOKE_TEST_OK`.
-- Deferred: Saved Invoices/History screen (`mockData.js` remains only for that deferred screen); physical printer verification for BC86AC/SNC-830 and Windows driver output differences.
+- Verification on 2026-11-17: `npm test` 17/17 pass, `npm run lint` 0 errors (remaining warnings are pre-existing CRLF/prettier notices), `npm run build` succeeds, and the Electron smoke test reports `SMOKE_TEST_OK`.
+- Saved Invoices screen is functional: lists persisted invoices with search/pagination, status badges, and View (receipt-preview modal), Edit (loads the invoice back into the New Invoice form via `storedInvoiceToDraft`), Delete (confirmation modal), and Print (reprint through the configured printer) actions; `mockData.js` was removed.
+- Packaging: `npm run dist` produces `release/Invoice Generator Setup 1.0.0.exe` (NSIS) and `release/Invoice Generator 1.0.0.exe` (portable); the electron-builder config lives in the `build` field of `package.json`.
+- The packaged app (win-unpacked) passes the smoke test with exit code 0 and prints `SMOKE_TEST_OK`, confirming `node:sqlite` works inside the packaged application.
+- Remaining: physical printer checklist for BC86AC/SNC-830 and Windows installed-printer output verification.
 
 ## Direction
 

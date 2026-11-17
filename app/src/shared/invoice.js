@@ -99,6 +99,36 @@ export function formatQuantityMilli(quantityMilli) {
   return `${whole}.${String(fraction).padStart(3, '0').replace(/0+$/, '')}`
 }
 
+// Convert a stored invoice (integer minor units / scaled quantities) back into
+// the editable draft values expected by normalizeInvoiceDraft.
+export function storedInvoiceToDraft(invoice) {
+  if (!invoice || !Array.isArray(invoice.items) || invoice.items.length === 0) {
+    throw new Error('Invoice has no line items')
+  }
+  return {
+    invoiceNumber: invoice.invoiceNumber,
+    invoiceDate: invoice.invoiceDate,
+    invoiceTime: invoice.invoiceTime,
+    customerName: invoice.customerName,
+    customerPhone: invoice.customerPhone,
+    customerAddress: invoice.customerAddress,
+    currency: invoice.currency,
+    insurance: (invoice.insurance / 100).toFixed(2),
+    shippingService: invoice.shippingService,
+    destinationAddress: invoice.destinationAddress,
+    packageWeight: invoice.packageWeight,
+    expectedDeliveryDate: invoice.expectedDeliveryDate || '',
+    trackingNumber: invoice.trackingNumber,
+    notes: invoice.notes,
+    items: invoice.items.map((item) => ({
+      id: item.id,
+      description: item.description,
+      qty: formatQuantityMilli(item.quantityMilli),
+      unitPrice: (item.unitPrice / 100).toFixed(2)
+    }))
+  }
+}
+
 export function normalizeInvoiceDraft(values, id) {
   const invoice = {
     id: requiredText(id, 'Invoice id'),

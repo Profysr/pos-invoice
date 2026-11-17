@@ -166,6 +166,12 @@ function registerIpcHandlers() {
 
   ipcMain.handle('printer:list-system', () => listSystemPrinters())
 
+  ipcMain.handle('invoice:list', () => database.listInvoices())
+
+  ipcMain.handle('invoice:get', (_event, id) => database.getInvoice(id))
+
+  ipcMain.handle('invoice:delete', (_event, id) => ({ deleted: database.deleteInvoice(id) }))
+
   ipcMain.handle('invoice:print', async (_event, payload) => {
     const saved = database.saveInvoice(payload.invoice, payload.items)
     database.setInvoicePrintStatus(saved.id, 'printing')

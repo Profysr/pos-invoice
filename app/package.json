@@ -4,6 +4,29 @@
   "description": "Local-first Windows invoice and thermal receipt generator",
   "main": "./out/main/index.js",
   "type": "module",
+  "build": {
+    "appId": "com.invoicegenerator.desktop",
+    "productName": "Invoice Generator",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
