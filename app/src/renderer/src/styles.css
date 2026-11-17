@@ -6,10 +6,110 @@ body,
 }
 
 body {
-  background: #f8f9fa;
+  background: #f4f5f7;
 }
 
+/* App shell layout: fixed sidebar, scrolling main area. */
 .app-shell {
+  display: flex;
   min-height: 100vh;
-  padding: 2rem;
+}
+
+.app-sidebar {
+  width: 232px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  padding: 12px 10px;
+}
+
+.app-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.app-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.app-workspace {
+  flex: 1;
+  padding: 16px;
+  /* Main area scrolls naturally. */
+  min-height: 0;
+}
+
+/* White content panels with subtle borders. */
+.app-placeholder-panel,
+.app-content-panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* Settings modal: side-nav layout inside the single modal. */
+.settings-modal-body {
+  padding: 0 !important;
+}
+
+.settings-modal-layout {
+  display: flex;
+  min-height: 420px;
+}
+
+.settings-side-nav {
+  width: 168px;
+  flex-shrink: 0;
+  border-right: 1px solid #e5e7eb;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-side-nav-item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.85rem;
+  color: #1f2937;
+  padding: 7px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.settings-side-nav-item:hover {
+  background: #f4f5f7;
+}
+
+.settings-side-nav-item-active {
+  background: #eff4ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.settings-section-area {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 18px;
+  overflow-y: auto;
+  max-height: 60vh;
 }
