@@ -1,33 +1,43 @@
-import Versions from './components/Versions'
-import electronLogo from './assets/electron.svg'
+import { useEffect, useState } from 'react'
+import { Alert, Badge, Stack, Text, Title } from '@mantine/core'
+import { IconReceipt } from '@tabler/icons-react'
 
 function App() {
-  const ipcHandle = () => window.electron.ipcRenderer.send('ping')
+  const [appInfo, setAppInfo] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    window.invoiceApi
+      .getAppInfo()
+      .then((info) => {
+        if (active) setAppInfo(info)
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   return (
-    <>
-      <img alt="logo" className="logo" src={electronLogo} />
-      <div className="creator">Powered by electron-vite</div>
-      <div className="text">
-        Build an Electron app with <span className="react">React</span>
-      </div>
-      <p className="tip">
-        Please try pressing <code>F12</code> to open the devTool
-      </p>
-      <div className="actions">
-        <div className="action">
-          <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">
-            Documentation
-          </a>
-        </div>
-        <div className="action">
-          <a target="_blank" rel="noreferrer" onClick={ipcHandle}>
-            Send IPC
-          </a>
-        </div>
-      </div>
-      <Versions></Versions>
-    </>
+    <main className="app-shell">
+      <Stack gap="sm">
+        <IconReceipt aria-hidden="true" size={36} />
+        <Title order={1}>Invoice Generator</Title>
+        <Text c="dimmed">Secure Electron foundation and local database are ready.</Text>
+        {error ? <Alert color="red">{error}</Alert> : null}
+        {appInfo ? (
+          <Badge variant="light">
+            Electron {appInfo.version} · Node {appInfo.nodeVersion} · {appInfo.platform} · SQLite
+            schema v{appInfo.databaseVersion}
+          </Badge>
+        ) : null}
+      </Stack>
+    </main>
   )
 }
 

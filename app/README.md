@@ -1,34 +1,23 @@
-# app
+# Invoice Generator
 
-An Electron application with React
+Local-first Windows invoice and thermal receipt generator built with Electron, React, Mantine, and SQLite.
 
-## Recommended IDE Setup
+## Requirements
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+- Windows 10/11 x64
+- Node.js 22.12 or newer
+- npm
 
-## Project Setup
+## Commands
 
-### Install
-
-```bash
-$ npm install
+```powershell
+npm install
+npm run dev
+npm test
+npm run build
+npm run dist
 ```
 
-### Development
+`npm run dist` creates the Windows NSIS installer and portable executable under `release/`.
 
-```bash
-$ npm run dev
-```
-
-### Build
-
-```bash
-# For windows
-$ npm run build:win
-
-# For macOS
-$ npm run build:mac
-
-# For Linux
-$ npm run build:linux
-```
+Local data is stored in Electron's `userData` directory. The SQLite database is at `database/invoices.sqlite`; it is never written inside the installation directory.
