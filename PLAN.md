@@ -3,7 +3,7 @@
 ## Current status
 
 - **Plan revised:** 2026-11-17
-- **Implementation status:** Phases 0–8 complete (New Invoice, settings, Saved Invoices with View/Edit/Delete/Print, both printer paths); Phase 9 automated checks and packaging complete — only the physical printer checklist remains
+- **Implementation status:** Shipping-receipt template complete (2026-11-17): single USPS-style template, 10 editable fields, logo raster over LAN, migration v2, History columns — `npm test` 21/21, lint 0 errors, build + smoke test pass; only the physical printer checklist remains
 - **Approval rule:** Each phase requires explicit user approval before any implementation work begins. A general approval does not automatically approve later phases.
 - **Implementation discipline:** Ponytail full mode applies to every phase.
 
@@ -13,7 +13,7 @@
 - `npm ci` completes successfully and `npm ls --depth=0` reports no missing or invalid packages; `npm audit --omit=dev` reports zero runtime vulnerabilities.
 - The development-only `electron-builder` dependency chain currently reports six moderate `minimatch` advisories with no non-breaking upstream fix; review during packaging rather than applying npm's forced downgrade.
 - The renderer runs with context isolation and sandboxing enabled, Node integration disabled, navigation blocked, and a narrow preload API.
-- SQLite schema version 1 includes settings, company metadata, printer profiles, invoices, invoice items, and print history under Electron's `userData` path.
+- SQLite schema version 2 includes settings, company metadata, printer profiles (with `dot_density`), invoices (with `shipping_from`, `insurance_label`), invoice items, and print history under Electron's `userData` path; migration v2 deletes pre-template invoice rows (single-template decision).
 - Focused database tests, lint, production build, and an Electron launch smoke test pass.
 - New Invoice workflow is functional: bootstrap loads company/printer/next invoice number from SQLite, form validates, and clicking the single primary Print action persists the invoice (save-on-print only; no Save button, no autosave).
 - Invoice numbers come from a persisted yearly SQLite counter (`invoiceNumberSequence:<year>`); deleted numbers are never reused.
@@ -21,7 +21,8 @@
 - Receipt Studio (commit `8e758eb0d129523a334bfb23953090ed216f7521`) code is ported: ESC/POS encoder and text sanitization (`src/main/printing.js`), raw TCP LAN sender with timeout/error handling, receipt wrapping/columns, money formatting, and the hidden-window Windows system-print path (`src/main/system-print.js`).
 - Settings modal persists company metadata (with logo choose/remove/preview) and printer profile (network ESC/POS TCP or Windows installed printer, paper/character widths, encoding, cut/feed, timeout) to SQLite.
 - Print flow records status (`printing` → `succeeded`/`failed`) and a print-history row; a TCP write success is reported as bytes delivered, not guaranteed physical output.
-- Verification on 2026-11-17: `npm test` 17/17 pass, `npm run lint` 0 errors (remaining warnings are pre-existing CRLF/prettier notices), `npm run build` succeeds, and the Electron smoke test reports `SMOKE_TEST_OK`.
+- Verification on 2026-11-17: `npm test` 21/21 pass (dates, shipping template, money, ESC/POS logo raster, database v2), `npm run lint` 0 errors (remaining warnings are pre-existing CRLF/prettier notices), `npm run build` succeeds, and the Electron smoke test reports `SMOKE_TEST_OK`.
+- Shipping receipt (2026-11-17): `src/shared/receipt.js` builds the single USPS-style template (logo, sender block, date/time, 4-column table, destination/weight, expected delivery, tracking, insurance, totals, two footer paragraphs); `src/shared/dates.js` formats `Mon 08/10/2026`, `6:06 PM`, and 4-digit tracking groups; money uses the currency symbol (`$65.22`); service name is a dropdown (`src/shared/shipping-services.js`); optional fields (destination, weight, insurance) are omitted from output when empty.
 - Saved Invoices screen is functional: lists persisted invoices with search/pagination, status badges, and View (receipt-preview modal), Edit (loads the invoice back into the New Invoice form via `storedInvoiceToDraft`), Delete (confirmation modal), and Print (reprint through the configured printer) actions; `mockData.js` was removed.
 - Packaging: `npm run dist` produces `release/Invoice Generator Setup 1.0.0.exe` (NSIS) and `release/Invoice Generator 1.0.0.exe` (portable); the electron-builder config lives in the `build` field of `package.json`.
 - The packaged app (win-unpacked) passes the smoke test with exit code 0 and prints `SMOKE_TEST_OK`, confirming `node:sqlite` works inside the packaged application.
@@ -463,11 +464,13 @@ No phase may be implemented early, even if a later phase was discussed or approv
 
 ## Physical printer test checklist
 
-- 58 mm and 80 mm alignment and margins
-- Long item descriptions and wrapping
-- Logo quality and size
-- Currency and punctuation
+- 58 mm and 80 mm alignment, margins, and 4-column table fit (`Product | Qty | Unit Price | Price`)
+- Logo raster over LAN (`GS v 0`) — correct size/centering; adjust dot density (4–16 dots/mm) if it prints stretched or clipped
+- Color logo threshold — no gray mush on thermal paper
+- Date/time/tracking formats: `Mon 08/10/2026`, `6:06 PM`, 4-digit tracking groups
+- Currency symbol and punctuation in footer paragraphs (CP437 sanitization)
+- Dashed rules render on both LAN ESC/POS and Windows installed-printer paths
 - Full/partial cut behavior on ESC/POS LAN output
 - Printer offline, timeout, reconnect, and physical-output limitations
-- Same invoice through LAN and installed Windows printer
-- Save → reload → print data consistency
+- Same receipt through LAN and installed Windows printer
+- Save → reload → print data consistency (shipping_from, insurance label, columns added by migration v2)
