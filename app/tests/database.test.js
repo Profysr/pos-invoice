@@ -136,3 +136,40 @@ test('enforces invoice-number uniqueness and records print history', (t) => {
   assert.equal(store.listPrintHistory('invoice-1').length, 1)
   assert.equal(store.listPrintHistory('invoice-1')[0].status, 'succeeded')
 })
+
+test('generates unique invoice numbers and updates print status', (t) => {
+  const { store } = createTestStore(t)
+
+  const first = store.nextInvoiceNumber()
+  const second = store.nextInvoiceNumber()
+  assert.match(first, /^INV-\d{4}-\d{4}$/)
+  assert.notEqual(first, second)
+
+  const invoice = {
+    id: 'invoice-status',
+    invoiceNumber: first,
+    invoiceDate: '2026-11-17',
+    invoiceTime: '10:30',
+    currency: 'USD'
+  }
+  const items = [
+    {
+      id: 'item-status',
+      description: 'Delivery service',
+      quantityMilli: 1000,
+      unitPrice: 1000
+    }
+  ]
+
+  store.saveInvoice(invoice, items)
+  assert.equal(store.setInvoicePrintStatus('invoice-status', 'printing'), true)
+  assert.equal(store.getInvoice('invoice-status').printStatus, 'printing')
+  assert.equal(store.setInvoicePrintStatus('invoice-status', 'succeeded'), true)
+  assert.equal(store.getInvoice('invoice-status').printStatus, 'succeeded')
+  assert.throws(() => store.setInvoicePrintStatus('invoice-status', 'printed'), /Invalid invoice print status/)
+
+  store.deleteInvoice('invoice-status')
+  const afterDelete = store.nextInvoiceNumber()
+  assert.notEqual(afterDelete, first)
+  assert.notEqual(afterDelete, second)
+})
