@@ -1,5 +1,3 @@
-// Single source of truth for all Mantine design tokens.
-// Do not introduce a second styling system — reference these tokens everywhere.
 import { createTheme } from '@mantine/core'
 
 export const tokens = {
@@ -8,8 +6,8 @@ export const tokens = {
   text: '#1f2937',
   textDimmed: '#6b7280',
   background: '#f8f9fa',
-  panel: '#ffffff',
-  border: '#e5e7eb',
+  panel: '#f4f4f4',
+  border: '#eee',
   danger: '#c92a2a',
   success: '#2b8a3e',
   radius: 5
