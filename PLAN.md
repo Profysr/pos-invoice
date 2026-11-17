@@ -25,6 +25,7 @@
 - Saved Invoices screen is functional: lists persisted invoices with search/pagination, status badges, and View (receipt-preview modal), Edit (loads the invoice back into the New Invoice form via `storedInvoiceToDraft`), Delete (confirmation modal), and Print (reprint through the configured printer) actions; `mockData.js` was removed.
 - Packaging: `npm run dist` produces `release/Invoice Generator Setup 1.0.0.exe` (NSIS) and `release/Invoice Generator 1.0.0.exe` (portable); the electron-builder config lives in the `build` field of `package.json`.
 - The packaged app (win-unpacked) passes the smoke test with exit code 0 and prints `SMOKE_TEST_OK`, confirming `node:sqlite` works inside the packaged application.
+- Preload fix (2026-11-17): `type: "module"` made electron-vite emit an ESM preload (`.mjs`) that Electron's sandboxed preload loader cannot parse (`SyntaxError: Cannot use import statement outside a module`), leaving `window.invoiceApi` undefined. The preload is now built as CommonJS (`build.lib.formats: ['cjs']` → `out/preload/index.cjs`) and main loads that exact path; the smoke test asserts `typeof window.invoiceApi === 'object'` before reporting success.
 - Remaining: physical printer checklist for BC86AC/SNC-830 and Windows installed-printer output verification.
 
 ## Direction
