@@ -5,7 +5,7 @@ function AppToolbar({ viewName, actions }) {
     <header className="app-toolbar">
       <Group justify="space-between" wrap="nowrap" gap="md" style={{ flex: 1 }}>
         <Group gap="sm" wrap="nowrap">
-          <Text fw={600} size="sm" c="text.0">
+          <Text fw={600} size="sm">
             Invoice Generator
           </Text>
           <Text size="sm" c="dimmed">

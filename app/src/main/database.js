@@ -279,6 +279,14 @@ export function createDatabaseStore(databasePath) {
         .run(key, value, now())
     },
 
+    nextInvoiceNumber() {
+      const year = new Date().getFullYear()
+      const key = `invoiceNumberSequence:${year}`
+      const next = Number(store.getSetting(key) || 0) + 1
+      store.setSetting(key, String(next))
+      return `INV-${year}-${String(next).padStart(4, '0')}`
+    },
+
     getCompany() {
       return mapCompany(database.prepare('SELECT * FROM company_metadata WHERE id = 1').get())
     },
@@ -534,6 +542,18 @@ export function createDatabaseStore(databasePath) {
 
     deleteInvoice(id) {
       return database.prepare('DELETE FROM invoices WHERE id = ?').run(id).changes > 0
+    },
+
+    setInvoicePrintStatus(id, status) {
+      const invoiceId = requiredText(id, 'Invoice id')
+      if (!['not_printed', 'queued', 'printing', 'succeeded', 'failed'].includes(status)) {
+        throw new Error('Invalid invoice print status')
+      }
+      return (
+        database
+          .prepare('UPDATE invoices SET print_status = ?, updated_at = ? WHERE id = ?')
+          .run(status, now(), invoiceId).changes > 0
+      )
     },
 
     addPrintHistory(input) {

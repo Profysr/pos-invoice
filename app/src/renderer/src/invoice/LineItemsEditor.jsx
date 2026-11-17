@@ -1,20 +1,6 @@
-import { ActionIcon, ScrollArea, Table, Text, TextInput, Button, Group, Stack } from '@mantine/core'
-import { IconTrash, IconPlus } from '@tabler/icons-react'
+import { ActionIcon, Button, Group, ScrollArea, Stack, Table, Text, TextInput } from '@mantine/core'
+import { IconPlus, IconTrash } from '@tabler/icons-react'
 
-/**
- * LineItemsEditor — spreadsheet-style table for invoice line items.
- * Display-only: no business calculations live here. Line totals arrive
- * through the `lineTotals` prop (index-aligned array of display strings
- * or numbers); the parent/backend computes them. Row changes are passed
- * up via `onChange(rows)`.
- *
- * Props:
- * - rows: [{ id, description, qty, unitPrice }]
- * - lineTotals: array of display values aligned by row index
- * - errors: { [rowId]: { description?, qty?, unitPrice? } } per-row errors
- * - onChange(rows): called with the new rows array on any edit/add/remove
- * - addRow(): appends a new empty row (owned by the parent's form state)
- */
 function LineItemsEditor({ rows, lineTotals = [], errors = {}, onChange, addRow }) {
   const updateRow = (id, field, value) => {
     onChange(rows.map((row) => (row.id === id ? { ...row, [field]: value } : row)))
@@ -25,8 +11,8 @@ function LineItemsEditor({ rows, lineTotals = [], errors = {}, onChange, addRow 
   }
 
   return (
-    <Stack gap={6} h="100%" mih={0}>
-      <ScrollArea flex={1} mih={0} offsetScrollbars="y" scrollbarSize={8}>
+    <Stack gap={6}>
+      <ScrollArea offsetScrollbars="x" scrollbarSize={8}>
         <Table withTableBorder withColumnBorders fz="xs" horizontalSpacing={6}>
           <Table.Thead>
             <Table.Tr>

@@ -1,14 +1,43 @@
-import { Box, Button, Divider, Group, Stack, Text, TextInput } from '@mantine/core'
+import { useState } from 'react'
+import { Box, Button, Divider, Group, Image, Stack, Text, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 
-function CompanyMetadataSection({ initialData, onSave }) {
+function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = false }) {
   const form = useForm({
     mode: 'uncontrolled',
-    initialValues: initialData
+    initialValues: {
+      name: initialData.name || '',
+      address: initialData.address || '',
+      phone: initialData.phone || '',
+      email: initialData.email || '',
+      defaultCurrency: initialData.defaultCurrency || 'USD',
+      logoPath: initialData.logoPath || null
+    }
   })
+  const [logoDataUrl, setLogoDataUrl] = useState(initialData.logoDataUrl || null)
+  const [choosingLogo, setChoosingLogo] = useState(false)
+
+  const chooseLogo = async () => {
+    if (!onChooseLogo) return
+    setChoosingLogo(true)
+    try {
+      const result = await onChooseLogo()
+      if (result?.path) {
+        form.setFieldValue('logoPath', result.path)
+        setLogoDataUrl(result.logoDataUrl || null)
+      }
+    } finally {
+      setChoosingLogo(false)
+    }
+  }
+
+  const removeLogo = () => {
+    form.setFieldValue('logoPath', null)
+    setLogoDataUrl(null)
+  }
 
   return (
-    <form onSubmit={form.onSubmit((values) => (onSave ? onSave(values) : null))}>
+    <form onSubmit={form.onSubmit(onSave)}>
       <Stack gap="md">
         <Box>
           <Text fw={600} size="sm" mb="xs">
@@ -18,17 +47,70 @@ function CompanyMetadataSection({ initialData, onSave }) {
             <TextInput
               label="Company name"
               placeholder="Business name shown on receipts"
+              required
               key={form.key('name')}
               {...form.getInputProps('name')}
             />
             <TextInput
-              label="Logo"
-              placeholder="Logo not configured"
-              disabled
-              key={form.key('logoText')}
-              {...form.getInputProps('logoText')}
+              label="Default currency"
+              placeholder="PKR"
+              description="Three-letter currency code used for new invoices"
+              key={form.key('defaultCurrency')}
+              {...form.getInputProps('defaultCurrency')}
             />
           </Stack>
+        </Box>
+
+        <Divider />
+
+        <Box>
+          <Text fw={600} size="sm" mb="xs">
+            Logo
+          </Text>
+          <Group align="end" gap="sm">
+            {logoDataUrl ? (
+              <Image
+                src={logoDataUrl}
+                alt="Company logo"
+                w={72}
+                h={72}
+                fit="contain"
+                withPlaceholder
+              />
+            ) : (
+              <Box
+                style={{
+                  width: 72,
+                  height: 72,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid var(--mantine-color-gray-2)',
+                  borderRadius: 5,
+                  color: 'var(--mantine-color-dimmed)',
+                  fontSize: 12
+                }}
+              >
+                No logo
+              </Box>
+            )}
+            <Stack gap={6}>
+              <Button
+                type="button"
+                variant="default"
+                size="xs"
+                loading={choosingLogo}
+                onClick={() => void chooseLogo()}
+              >
+                Choose logo
+              </Button>
+              {form.values.logoPath && (
+                <Button type="button" variant="subtle" color="red" size="xs" onClick={removeLogo}>
+                  Remove logo
+                </Button>
+              )}
+            </Stack>
+          </Group>
         </Box>
 
         <Divider />
@@ -70,22 +152,10 @@ function CompanyMetadataSection({ initialData, onSave }) {
 
         <Divider />
 
-        <Box>
-          <Text fw={600} size="sm" mb="xs">
-            Tax info
-          </Text>
-          <TextInput
-            label="Tax number (NTN)"
-            placeholder="NTN-0000000-0"
-            key={form.key('taxNumber')}
-            {...form.getInputProps('taxNumber')}
-          />
-        </Box>
-
-        <Divider />
-
         <Group justify="flex-end">
-          <Button type="submit">Save</Button>
+          <Button type="submit" loading={saving}>
+            Save
+          </Button>
         </Group>
       </Stack>
     </form>

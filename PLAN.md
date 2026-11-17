@@ -3,7 +3,7 @@
 ## Current status
 
 - **Plan revised:** 2026-11-17
-- **Implementation status:** Phases 0–2 complete; Phase 3 awaits explicit approval
+- **Implementation status:** Phases 0–5 and the narrowed Phase 7/8 printing scope complete (New Invoice + settings + both printer paths); Saved Invoices/History (Phase 6 table UI) deferred; Phase 9 packaging and physical hardware checks remain
 - **Approval rule:** Each phase requires explicit user approval before any implementation work begins. A general approval does not automatically approve later phases.
 - **Implementation discipline:** Ponytail full mode applies to every phase.
 
@@ -15,6 +15,14 @@
 - The renderer runs with context isolation and sandboxing enabled, Node integration disabled, navigation blocked, and a narrow preload API.
 - SQLite schema version 1 includes settings, company metadata, printer profiles, invoices, invoice items, and print history under Electron's `userData` path.
 - Focused database tests, lint, production build, and an Electron launch smoke test pass.
+- New Invoice workflow is functional: bootstrap loads company/printer/next invoice number from SQLite, form validates, and clicking the single primary Print action persists the invoice (save-on-print only; no Save button, no autosave).
+- Invoice numbers come from a persisted yearly SQLite counter (`invoiceNumberSequence:<year>`); deleted numbers are never reused.
+- Money is integer minor units, quantities are scaled thousandths, and shared calculation/receipt modules (`src/shared/invoice.js`, `src/shared/receipt.js`) drive both the live preview and printing.
+- Receipt Studio (commit `8e758eb0d129523a334bfb23953090ed216f7521`) code is ported: ESC/POS encoder and text sanitization (`src/main/printing.js`), raw TCP LAN sender with timeout/error handling, receipt wrapping/columns, money formatting, and the hidden-window Windows system-print path (`src/main/system-print.js`).
+- Settings modal persists company metadata (with logo choose/remove/preview) and printer profile (network ESC/POS TCP or Windows installed printer, paper/character widths, encoding, cut/feed, timeout) to SQLite.
+- Print flow records status (`printing` → `succeeded`/`failed`) and a print-history row; a TCP write success is reported as bytes delivered, not guaranteed physical output.
+- Verification on 2026-11-17: `npm test` 16/16 pass, `npm run lint` 0 errors (remaining warnings are pre-existing CRLF/prettier notices), `npm run build` succeeds, and the Electron smoke test reports `SMOKE_TEST_OK`.
+- Deferred: Saved Invoices/History screen (`mockData.js` remains only for that deferred screen); physical printer verification for BC86AC/SNC-830 and Windows driver output differences.
 
 ## Direction
 
@@ -161,12 +169,10 @@ One page with a compact Mantine toolbar and two columns:
    - Logo, company header, invoice/customer details, items, shipping/tracking, totals, and footer
    - Updates immediately as the form changes
 
-Toolbar actions:
+Toolbar actions (approved narrowed scope):
 
-- Save invoice
-- New/clear invoice
-- Print
-- Printer settings
+- Single primary **Print** action, top-right — saves the invoice to SQLite and prints in one step (no separate Save button, no autosave)
+- Printer settings live in the Settings modal (sidebar), not as a toolbar action
 
 The thermal receipt preview must be a dedicated component with receipt-specific dimensions and typography. Do not build it from ordinary Mantine cards or tables.
 

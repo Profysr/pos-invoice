@@ -1,121 +1,217 @@
-import { Flex, Group, Stack, TextInput, Textarea, Button, Divider, Title } from '@mantine/core'
-import { IconDeviceFloppy, IconPrinter } from '@tabler/icons-react'
+import {
+  Button,
+  Divider,
+  Flex,
+  Group,
+  ScrollArea,
+  Stack,
+  Text,
+  Textarea,
+  TextInput,
+  Title
+} from '@mantine/core'
+import { IconPrinter } from '@tabler/icons-react'
+import { formatMoney } from '../../../shared/invoice.js'
 
-/**
- * InvoiceForm — presentational form shell for the New Invoice workspace.
- * The @mantine/form instance is owned by NewInvoicePage and passed in.
- *
- * Props:
- * - form: @mantine/form instance with values { customerName, customerPhone,
- *   customerAddress, invoiceNumber, invoiceDate, invoiceTime, notes }
- * - onSubmit(values): submit handler wired to form.onSubmit (save path)
- * - onPrint(): backend integration callback
- * - saving / printing: busy flags for the action buttons
- * - lineItemsSlot: node rendered below the invoice details section
- *   (the line-items editor is injected by the page)
- */
-function InvoiceForm({ form, onSubmit, onPrint, saving = false, printing = false, lineItemsSlot }) {
+function InvoiceForm({
+  form,
+  onPrint,
+  printing = false,
+  lineItemsSlot,
+  totals = { subtotal: 0, insurance: 0, total: 0 },
+  currency = 'USD'
+}) {
   return (
     <form
-      onSubmit={onSubmit}
+      onSubmit={(event) => event.preventDefault()}
       noValidate
-      style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}
     >
-      <Stack gap="sm" flex={1} mih={0}>
-        <section>
-          <Title order={4}>Customer</Title>
-          <Stack gap="xs" mt={6}>
-            <TextInput
-              label="Customer name"
-              placeholder="e.g. Bilal Ahmad"
-              required
-              key={form.key('customerName')}
-              {...form.getInputProps('customerName')}
-            />
-            <Flex gap="xs" wrap="wrap">
-              <TextInput
-                label="Phone"
-                placeholder="+92 ..."
-                style={{ flex: '1 1 160px' }}
-                key={form.key('customerPhone')}
-                {...form.getInputProps('customerPhone')}
-              />
-              <TextInput
-                label="Address"
-                placeholder="Street, city"
-                style={{ flex: '2 1 240px' }}
-                key={form.key('customerAddress')}
-                {...form.getInputProps('customerAddress')}
-              />
-            </Flex>
-          </Stack>
-        </section>
-
-        <Divider />
-
-        <section>
-          <Title order={4}>Invoice details</Title>
-          <Flex gap="xs" wrap="wrap" mt={6}>
-            <TextInput
-              label="Invoice #"
-              placeholder="INV-2026-0001"
-              style={{ flex: '1 1 140px' }}
-              key={form.key('invoiceNumber')}
-              {...form.getInputProps('invoiceNumber')}
-            />
-            <TextInput
-              label="Date"
-              type="date"
-              style={{ flex: '1 1 140px' }}
-              key={form.key('invoiceDate')}
-              {...form.getInputProps('invoiceDate')}
-            />
-            <TextInput
-              label="Time"
-              type="time"
-              style={{ flex: '1 1 110px' }}
-              key={form.key('invoiceTime')}
-              {...form.getInputProps('invoiceTime')}
-            />
-          </Flex>
-        </section>
-
-        <Divider />
-
-        <section style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <Title order={4}>Items</Title>
-          <div style={{ marginTop: 6, flex: 1, minHeight: 0 }}>{lineItemsSlot}</div>
-        </section>
-
-        <Divider />
-
-        <section>
-          <Title order={4}>Notes</Title>
-          <Textarea
-            placeholder="Optional notes printed at the bottom of the receipt"
-            autosize
-            minRows={2}
-            maxRows={4}
-            mt={6}
-            key={form.key('notes')}
-            {...form.getInputProps('notes')}
-          />
-        </section>
-      </Stack>
-
-      <Group justify="flex-end" gap="xs" mt="sm">
+      <Group justify="space-between" align="flex-start" gap="sm" mb="sm" wrap="nowrap">
+        <div>
+          <Title order={3}>New invoice</Title>
+          <Text size="xs" c="dimmed">
+            Review the receipt preview, then print.
+          </Text>
+        </div>
         <Button
-          variant="default"
+          type="button"
           leftSection={<IconPrinter size={16} />}
           onClick={onPrint}
           loading={printing}
         >
           Print
         </Button>
-        <Button type="submit" leftSection={<IconDeviceFloppy size={16} />} loading={saving}>
-          Save invoice
-        </Button>
       </Group>
+
+      <ScrollArea flex={1} mih={0} offsetScrollbars="y" scrollbarSize={8}>
+        <Stack gap="sm">
+          <section>
+            <Title order={4}>Customer</Title>
+            <Stack gap="xs" mt={6}>
+              <TextInput
+                label="Customer name"
+                placeholder="e.g. Bilal Ahmad"
+                required
+                key={form.key('customerName')}
+                {...form.getInputProps('customerName')}
+              />
+              <Flex gap="xs" wrap="wrap">
+                <TextInput
+                  label="Phone"
+                  placeholder="+92 ..."
+                  style={{ flex: '1 1 160px' }}
+                  key={form.key('customerPhone')}
+                  {...form.getInputProps('customerPhone')}
+                />
+                <TextInput
+                  label="Address"
+                  placeholder="Street, city"
+                  style={{ flex: '2 1 240px' }}
+                  key={form.key('customerAddress')}
+                  {...form.getInputProps('customerAddress')}
+                />
+              </Flex>
+            </Stack>
+          </section>
+
+          <Divider />
+
+          <section>
+            <Title order={4}>Invoice details</Title>
+            <Flex gap="xs" wrap="wrap" mt={6}>
+              <TextInput
+                label="Invoice #"
+                placeholder="INV-2026-0001"
+                readOnly
+                style={{ flex: '1 1 160px' }}
+                key={form.key('invoiceNumber')}
+                {...form.getInputProps('invoiceNumber')}
+              />
+              <TextInput
+                label="Date"
+                type="date"
+                style={{ flex: '1 1 140px' }}
+                key={form.key('invoiceDate')}
+                {...form.getInputProps('invoiceDate')}
+              />
+              <TextInput
+                label="Time"
+                type="time"
+                style={{ flex: '1 1 110px' }}
+                key={form.key('invoiceTime')}
+                {...form.getInputProps('invoiceTime')}
+              />
+              <TextInput
+                label="Currency"
+                placeholder="PKR"
+                description="Three-letter currency code"
+                style={{ flex: '1 1 110px' }}
+                key={form.key('currency')}
+                {...form.getInputProps('currency')}
+              />
+            </Flex>
+          </section>
+
+          <Divider />
+
+          <section>
+            <Title order={4}>Items</Title>
+            <div style={{ marginTop: 6 }}>{lineItemsSlot}</div>
+          </section>
+
+          <Divider />
+
+          <section>
+            <Title order={4}>Fulfillment</Title>
+            <Flex gap="xs" wrap="wrap" mt={6}>
+              <TextInput
+                label="Shipping service"
+                placeholder="e.g. TCS"
+                style={{ flex: '1 1 180px' }}
+                key={form.key('shippingService')}
+                {...form.getInputProps('shippingService')}
+              />
+              <TextInput
+                label="Tracking number"
+                placeholder="Optional"
+                style={{ flex: '1 1 180px' }}
+                key={form.key('trackingNumber')}
+                {...form.getInputProps('trackingNumber')}
+              />
+              <TextInput
+                label="Package weight"
+                placeholder="e.g. 2.5 kg"
+                style={{ flex: '1 1 140px' }}
+                key={form.key('packageWeight')}
+                {...form.getInputProps('packageWeight')}
+              />
+              <TextInput
+                label="Expected delivery"
+                type="date"
+                style={{ flex: '1 1 160px' }}
+                key={form.key('expectedDeliveryDate')}
+                {...form.getInputProps('expectedDeliveryDate')}
+              />
+              <TextInput
+                label="Destination address"
+                placeholder="City, address"
+                style={{ flex: '2 1 260px' }}
+                key={form.key('destinationAddress')}
+                {...form.getInputProps('destinationAddress')}
+              />
+            </Flex>
+          </section>
+
+          <Divider />
+
+          <section>
+            <Title order={4}>Insurance and notes</Title>
+            <Stack gap="xs" mt={6}>
+              <TextInput
+                label="Insurance amount"
+                placeholder="0.00"
+                inputMode="decimal"
+                key={form.key('insurance')}
+                {...form.getInputProps('insurance')}
+              />
+              <Textarea
+                label="Notes"
+                placeholder="Optional notes printed at the bottom of the receipt"
+                autosize
+                minRows={2}
+                maxRows={4}
+                key={form.key('notes')}
+                {...form.getInputProps('notes')}
+              />
+            </Stack>
+          </section>
+        </Stack>
+      </ScrollArea>
+
+      <Divider mt="sm" />
+      <Stack gap={4} mt="xs">
+        <Group justify="space-between" gap="sm">
+          <Text size="sm" c="dimmed">
+            Subtotal
+          </Text>
+          <Text size="sm">{formatMoney(totals.subtotal, currency)}</Text>
+        </Group>
+        <Group justify="space-between" gap="sm">
+          <Text size="sm" c="dimmed">
+            Insurance
+          </Text>
+          <Text size="sm">{formatMoney(totals.insurance, currency)}</Text>
+        </Group>
+        <Group justify="space-between" gap="sm">
+          <Text size="sm" fw={700}>
+            Grand total
+          </Text>
+          <Text size="sm" fw={700}>
+            {formatMoney(totals.total, currency)}
+          </Text>
+        </Group>
+      </Stack>
     </form>
   )
 }
