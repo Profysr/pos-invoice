@@ -89,7 +89,7 @@ function createWindow() {
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -108,8 +108,18 @@ function createWindow() {
 
   if (process.env.INVOICE_APP_SMOKE_TEST === '1') {
     mainWindow.webContents.once('did-finish-load', () => {
-      console.log(`SMOKE_TEST_OK node=${process.versions.node}`)
-      app.quit()
+      // Verify the preload bridge actually exists — a missing preload still loads the page.
+      mainWindow.webContents
+        .executeJavaScript('typeof window.invoiceApi')
+        .then((apiType) => {
+          console.log(
+            apiType === 'object'
+              ? `SMOKE_TEST_OK node=${process.versions.node}`
+              : `SMOKE_TEST_FAIL invoiceApi=${apiType}`
+          )
+        })
+        .catch((error) => console.log(`SMOKE_TEST_FAIL ${error.message}`))
+        .finally(() => app.quit())
     })
   }
 }
