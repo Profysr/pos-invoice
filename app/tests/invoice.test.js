@@ -1,14 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  calculateInvoiceTotals,
-  calculateLineTotal,
   formatMoney,
-  formatQuantityMilli,
-  normalizeInvoiceDraft,
+  normalizeShippingReceiptDraft,
   parseMoneyToMinorUnits,
-  parseQuantityToMilli,
-  storedInvoiceToDraft
+  storedShippingReceiptToDraft
 } from '../src/shared/invoice.js'
 
 test('parses money into integer minor units', () => {
@@ -21,119 +17,94 @@ test('parses money into integer minor units', () => {
   assert.throws(() => parseMoneyToMinorUnits('abc'), /non-negative/)
 })
 
-test('parses decimal quantities into scaled integers', () => {
-  assert.equal(parseQuantityToMilli('1'), 1000)
-  assert.equal(parseQuantityToMilli('1.25'), 1250)
-  assert.equal(parseQuantityToMilli('.5'), 500)
-  assert.throws(() => parseQuantityToMilli('0'), /greater than zero/)
-  assert.throws(() => parseQuantityToMilli('1.2345'), /three decimals/)
+test('formats money with the currency symbol', () => {
+  assert.equal(formatMoney(1750, 'USD'), '$17.50')
+  assert.equal(formatMoney(6522, 'USD'), '$65.22')
 })
 
-test('calculates line and invoice totals with explicit rounding', () => {
-  assert.equal(calculateLineTotal(1500, 1000), 1500)
-  assert.equal(calculateLineTotal(1250, 999), 1249)
-
-  const totals = calculateInvoiceTotals(
-    [
-      { quantityMilli: 1500, unitPrice: 1000 },
-      { quantityMilli: 1000, unitPrice: 250 }
-    ],
-    250
-  )
-
-  assert.equal(totals.subtotal, 1750)
-  assert.equal(totals.insurance, 250)
-  assert.equal(totals.total, 2000)
-  assert.equal(totals.items[0].lineTotal, 1500)
-})
-
-test('formats money and quantities for receipt display', () => {
-  assert.equal(formatMoney(1750, 'USD'), 'USD 17.50')
-  assert.equal(formatQuantityMilli(1000), '1')
-  assert.equal(formatQuantityMilli(1250), '1.25')
-  assert.equal(formatQuantityMilli(1050), '1.05')
-})
-
-test('normalizes a complete invoice draft for persistence', () => {
-  const result = normalizeInvoiceDraft(
+test('normalizes a shipping receipt draft for persistence', () => {
+  const { invoice, items } = normalizeShippingReceiptDraft(
     {
       invoiceNumber: 'INV-2026-0001',
-      invoiceDate: '2026-11-17',
-      invoiceTime: '10:30',
-      customerName: 'Bilal Ahmad',
-      customerPhone: '+92 300',
-      customerAddress: 'Lahore',
-      currency: 'pkr',
-      insurance: '25.00',
-      shippingService: 'TCS',
-      destinationAddress: 'Islamabad',
-      packageWeight: '2 kg',
-      expectedDeliveryDate: '2026-11-18',
-      trackingNumber: 'TRACK-1',
-      notes: 'Handle carefully',
-      items: [
-        { id: 'item-1', description: 'LED bulb', qty: '4', unitPrice: '450.00' },
-        { id: 'item-2', description: 'Cord', qty: '1', unitPrice: '1250' }
-      ]
+      date: '2026-08-10',
+      time: '18:06',
+      trackingNumber: '9201990367007536409945',
+      price: '65.22',
+      shippingFrom: 'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036',
+      expectedDeliveryDate: '2026-08-13',
+      service: 'Prepaid Mail',
+      destination: 'DANBURY CT 06810',
+      weight: '14 lb 6.0 oz',
+      insuranceLabel: 'Up to $100.00 included',
+      insuranceAmount: '0.00',
+      currency: 'usd'
     },
-    'invoice-1'
+    'receipt-1'
   )
 
-  assert.equal(result.invoice.currency, 'PKR')
-  assert.equal(result.invoice.insurance, 2500)
-  assert.equal(result.items[0].quantityMilli, 4000)
-  assert.equal(result.items[0].unitPrice, 45000)
-  assert.equal(result.items[1].unitPrice, 125000)
+  assert.equal(invoice.currency, 'USD')
+  assert.equal(invoice.shippingFrom, 'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036')
+  assert.equal(invoice.insuranceLabel, 'Up to $100.00 included')
+  assert.equal(invoice.insurance, 0)
+  assert.equal(items.length, 1)
+  assert.equal(items[0].description, 'Prepaid Mail')
+  assert.equal(items[0].unitPrice, 6522)
 })
 
-test('rejects incomplete invoice drafts', () => {
+test('rejects incomplete shipping receipt drafts', () => {
   assert.throws(
     () =>
-      normalizeInvoiceDraft(
+      normalizeShippingReceiptDraft(
         {
           invoiceNumber: '',
-          invoiceDate: '2026-11-17',
-          invoiceTime: '10:30',
-          customerName: 'Bilal',
-          currency: 'USD',
-          items: []
+          date: '2026-08-10',
+          time: '18:06',
+          trackingNumber: '1234',
+          price: '65.22',
+          shippingFrom: 'DE MOSS'
         },
-        'invoice-1'
+        'receipt-1'
       ),
-    /Customer name|Invoice number|at least one/
+    /Reference number/
+  )
+
+  assert.throws(
+    () =>
+      normalizeShippingReceiptDraft(
+        {
+          invoiceNumber: 'INV-1',
+          date: '2026-08-10',
+          time: '18:06',
+          trackingNumber: '1234',
+          price: 'abc',
+          shippingFrom: 'DE MOSS'
+        },
+        'receipt-1'
+      ),
+    /Price/
   )
 })
 
-test('round-trips a stored invoice back into draft values', () => {
-  const original = normalizeInvoiceDraft(
-    {
-      invoiceNumber: 'INV-2026-0007',
-      invoiceDate: '2026-11-17',
-      invoiceTime: '10:30',
-      customerName: 'Bilal Ahmad',
-      customerPhone: '+92 300',
-      customerAddress: 'Lahore',
-      currency: 'PKR',
-      insurance: '25.00',
-      shippingService: 'TCS',
-      destinationAddress: 'Islamabad',
-      packageWeight: '2.5 kg',
-      expectedDeliveryDate: '2026-11-18',
-      trackingNumber: 'TRACK-9',
-      notes: 'Handle carefully',
-      items: [
-        { id: 'item-1', description: 'LED bulb', qty: '4', unitPrice: '450.00' },
-        { id: 'item-2', description: 'Cord', qty: '1.05', unitPrice: '1250' },
-        { id: 'item-3', description: 'Free sample', qty: '1', unitPrice: '0' }
-      ]
-    },
-    'invoice-7'
-  )
+test('round-trips a stored receipt back into draft values', () => {
+  const stored = {
+    invoiceNumber: 'INV-2026-0001',
+    invoiceDate: '2026-08-10',
+    invoiceTime: '18:06',
+    currency: 'USD',
+    trackingNumber: '9201990367007536409945',
+    subtotal: 6522,
+    insurance: 0,
+    shippingFrom: 'DE MOSS',
+    expectedDeliveryDate: '2026-08-13',
+    shippingService: 'Prepaid Mail',
+    destinationAddress: 'DANBURY CT 06810',
+    packageWeight: '14 lb 6.0 oz',
+    insuranceLabel: 'Up to $100.00 included'
+  }
 
-  const stored = { ...original.invoice, items: original.items }
-  const roundTripped = normalizeInvoiceDraft(storedInvoiceToDraft(stored), 'invoice-7')
-
-  assert.deepEqual(roundTripped.invoice, original.invoice)
-  assert.deepEqual(roundTripped.items, original.items)
-  assert.throws(() => storedInvoiceToDraft({ ...stored, items: [] }), /no line items/)
+  const draft = storedShippingReceiptToDraft(stored)
+  assert.equal(draft.price, '65.22')
+  assert.equal(draft.trackingNumber, '9201990367007536409945')
+  assert.equal(draft.shippingFrom, 'DE MOSS')
+  assert.equal(draft.insuranceAmount, '0.00')
 })

@@ -4,8 +4,9 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 import icon from '../../resources/icon.png?asset'
 import { createDatabaseStore, initializeUserData } from './database.js'
-import { buildReceiptLines } from '../shared/receipt.js'
+import { buildShippingReceiptLines } from '../shared/receipt.js'
 import { escPosBytes, sendNetwork } from './printing.js'
+import { rasterizeLogo } from './logo-raster.js'
 import { printSystem } from './system-print.js'
 
 let database
@@ -34,6 +35,7 @@ function defaultPrinter() {
     paperWidthMm: 80,
     printableWidthMm: 72,
     characterWidth: 48,
+    dotDensity: 8,
     encoding: 'CP437',
     cutAfterPrint: true,
     feedLinesAfterPrint: 2,
@@ -49,10 +51,19 @@ function localDateParts(date = new Date()) {
   }
 }
 
+// The bundled template logo is used until the client picks one in Settings.
+function defaultLogoPath() {
+  return join(__dirname, '../../resources/receipt-logo.png')
+}
+
+function effectiveLogoPath(company) {
+  return company?.logoPath || defaultLogoPath()
+}
+
 async function withLogoDataUrl(company) {
-  if (!company?.logoPath) return { ...defaultCompany(), ...company, logoDataUrl: null }
+  const logoPath = effectiveLogoPath(company)
   try {
-    const extension = extname(company.logoPath).toLowerCase()
+    const extension = extname(logoPath).toLowerCase()
     const mimeTypes = {
       '.png': 'image/png',
       '.jpg': 'image/jpeg',
@@ -61,11 +72,11 @@ async function withLogoDataUrl(company) {
       '.gif': 'image/gif'
     }
     const mime = mimeTypes[extension]
-    if (!mime) return { ...company, logoDataUrl: null }
-    const data = await readFile(company.logoPath)
-    return { ...company, logoDataUrl: `data:${mime};base64,${data.toString('base64')}` }
+    if (!mime) return { ...defaultCompany(), ...company, logoDataUrl: null }
+    const data = await readFile(logoPath)
+    return { ...defaultCompany(), ...company, logoDataUrl: `data:${mime};base64,${data.toString('base64')}` }
   } catch {
-    return { ...company, logoDataUrl: null }
+    return { ...defaultCompany(), ...company, logoDataUrl: null }
   }
 }
 
@@ -199,19 +210,30 @@ function registerIpcHandlers() {
     }
 
     const company = database.getCompany() || defaultCompany()
-    const lines = buildReceiptLines({ invoice: saved, company, printer })
+    const logoPath = effectiveLogoPath(company)
+    const lines = buildShippingReceiptLines({
+      receipt: saved,
+      company: { ...company, logoPath },
+      printer
+    })
 
     try {
       let result
       if (printer.connectionType === 'network') {
+        const dotDensity = Number(printer.dotDensity) || 8
+        const printableDots = Math.round((Number(printer.printableWidthMm) || 72) * dotDensity)
+        const logo = rasterizeLogo(logoPath, { widthDots: Math.round(printableDots * 0.7) })
         const bytes = escPosBytes(lines, printer.characterWidth, {
           cut: printer.cutAfterPrint,
           feed: printer.feedLinesAfterPrint,
-          encoding: printer.encoding
+          encoding: printer.encoding,
+          logo,
+          printableDots
         })
         result = await sendNetwork(printer, bytes)
       } else {
-        result = await printSystem(lines, printer)
+        const logoDataUrl = (await withLogoDataUrl(company)).logoDataUrl
+        result = await printSystem(lines, printer, logoDataUrl)
       }
 
       database.setInvoicePrintStatus(saved.id, 'succeeded')

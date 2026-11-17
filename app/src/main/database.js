@@ -93,6 +93,19 @@ const migrations = [
       CREATE INDEX invoice_items_invoice_id_idx ON invoice_items(invoice_id);
       CREATE INDEX print_history_invoice_id_idx ON print_history(invoice_id);
     `
+  },
+  {
+    version: 2,
+    sql: `
+      ALTER TABLE invoices ADD COLUMN shipping_from TEXT NOT NULL DEFAULT '';
+      ALTER TABLE invoices ADD COLUMN insurance_label TEXT NOT NULL DEFAULT '';
+      ALTER TABLE printer_profiles ADD COLUMN dot_density REAL NOT NULL DEFAULT 8;
+
+      -- The shipping receipt is the only template now, so the old invoice rows go.
+      DELETE FROM invoice_items;
+      DELETE FROM print_history;
+      DELETE FROM invoices;
+    `
   }
 ]
 
@@ -210,6 +223,7 @@ function mapPrinter(row) {
     paperWidthMm: row.paper_width_mm,
     printableWidthMm: row.printable_width_mm,
     characterWidth: row.character_width,
+    dotDensity: row.dot_density ?? 8,
     encoding: row.encoding,
     cutAfterPrint: Boolean(row.cut_after_print),
     feedLinesAfterPrint: row.feed_lines_after_print,
@@ -239,6 +253,8 @@ function mapInvoice(row, items = []) {
     packageWeight: row.package_weight,
     expectedDeliveryDate: row.expected_delivery_date,
     trackingNumber: row.tracking_number,
+    shippingFrom: row.shipping_from || '',
+    insuranceLabel: row.insurance_label || '',
     notes: row.notes,
     printStatus: row.print_status,
     createdAt: row.created_at,
@@ -363,6 +379,10 @@ export function createDatabaseStore(databasePath) {
       const paperWidthMm = positiveNumber(input?.paperWidthMm, 'Paper width')
       const printableWidthMm = positiveNumber(input?.printableWidthMm, 'Printable width')
       const characterWidth = positiveInteger(input?.characterWidth, 'Character width')
+      const dotDensity = Number(input?.dotDensity) || 8
+      if (dotDensity < 4 || dotDensity > 16) {
+        throw new Error('Dot density must be between 4 and 16 dots per millimetre')
+      }
       const encoding = requiredText(input?.encoding ?? 'CP437', 'Printer encoding')
       const cutAfterPrint = input?.cutAfterPrint ?? true
       const feedLinesAfterPrint = input?.feedLinesAfterPrint ?? 0
@@ -382,9 +402,9 @@ export function createDatabaseStore(databasePath) {
         .prepare(
           `INSERT INTO printer_profiles
              (id, name, connection_type, network_host, network_port, system_printer_name,
-              paper_width_mm, printable_width_mm, character_width, encoding, cut_after_print,
-              feed_lines_after_print, timeout_ms, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              paper_width_mm, printable_width_mm, character_width, dot_density, encoding,
+              cut_after_print, feed_lines_after_print, timeout_ms, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              name = excluded.name,
              connection_type = excluded.connection_type,
@@ -394,6 +414,7 @@ export function createDatabaseStore(databasePath) {
              paper_width_mm = excluded.paper_width_mm,
              printable_width_mm = excluded.printable_width_mm,
              character_width = excluded.character_width,
+             dot_density = excluded.dot_density,
              encoding = excluded.encoding,
              cut_after_print = excluded.cut_after_print,
              feed_lines_after_print = excluded.feed_lines_after_print,
@@ -410,6 +431,7 @@ export function createDatabaseStore(databasePath) {
           paperWidthMm,
           printableWidthMm,
           characterWidth,
+          dotDensity,
           encoding,
           cutAfterPrint ? 1 : 0,
           feedLinesAfterPrint,
@@ -469,8 +491,9 @@ export function createDatabaseStore(databasePath) {
                (id, invoice_number, invoice_date, invoice_time, customer_name, customer_phone,
                 customer_email, customer_address, currency, subtotal, insurance, total,
                 shipping_service, destination_address, package_weight, expected_delivery_date,
-                tracking_number, notes, print_status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tracking_number, shipping_from, insurance_label, notes, print_status,
+                created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(id) DO UPDATE SET
                invoice_number = excluded.invoice_number,
                invoice_date = excluded.invoice_date,
@@ -488,6 +511,8 @@ export function createDatabaseStore(databasePath) {
                package_weight = excluded.package_weight,
                expected_delivery_date = excluded.expected_delivery_date,
                tracking_number = excluded.tracking_number,
+               shipping_from = excluded.shipping_from,
+               insurance_label = excluded.insurance_label,
                notes = excluded.notes,
                print_status = excluded.print_status,
                updated_at = excluded.updated_at`
@@ -512,6 +537,8 @@ export function createDatabaseStore(databasePath) {
               ? optionalText(input.expectedDeliveryDate, 'Expected delivery date')
               : null,
             optionalText(input?.trackingNumber, 'Tracking number'),
+            optionalText(input?.shippingFrom, 'Shipping from'),
+            optionalText(input?.insuranceLabel, 'Insurance label'),
             optionalText(input?.notes, 'Invoice notes'),
             existing?.printStatus ?? 'not_printed',
             existing?.createdAt ?? timestamp,

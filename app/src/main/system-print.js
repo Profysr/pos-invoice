@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { receiptLinesToHtml } from './printing.js'
 
-export async function printSystem(lines, printer) {
+export async function printSystem(lines, printer, logoDataUrl = '') {
   const owner =
     BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows().find((window) => window.isVisible())
   const window = new BrowserWindow({
@@ -10,7 +10,7 @@ export async function printSystem(lines, printer) {
   })
 
   try {
-    const html = receiptLinesToHtml(lines, printer)
+    const html = receiptLinesToHtml(lines, printer, logoDataUrl)
     await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
     return await new Promise((resolve, reject) => {
       window.webContents.print(

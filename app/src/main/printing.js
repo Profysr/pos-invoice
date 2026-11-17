@@ -32,8 +32,16 @@ export function sanitizeEscPosText(value) {
 }
 
 export function escPosBytes(lines, width = 48, options = {}) {
-  const { cut = true, feed = 4, encoding = 'CP437' } = options
+  const {
+    cut = true,
+    feed = 4,
+    encoding = 'CP437',
+    logo = null,
+    printableDots = 0,
+    dotsPerChar = 12
+  } = options
   const chunks = [ESC, 0x40]
+  const parts = []
   const normalized = encoding
     .toLowerCase()
     .replace(/windows-/, 'win')
@@ -44,6 +52,13 @@ export function escPosBytes(lines, width = 48, options = {}) {
   const target = iconv.encodingExists(normalized) ? normalized : 'ascii'
   const write = (value) => chunks.push(...iconv.encode(sanitizeEscPosText(value), target), 0x0a)
   const alignment = (value) => (value === 'center' ? 1 : value === 'right' ? 2 : 0)
+  // Keeps the raster bytes in stream order instead of appending them at the end.
+  const writeBuffer = (buffer) => {
+    if (chunks.length > 0) {
+      parts.push(Buffer.from(chunks.splice(0, chunks.length)))
+    }
+    parts.push(buffer)
+  }
 
   for (const line of lines) {
     if (line?.type === 'feed') {
@@ -54,6 +69,23 @@ export function escPosBytes(lines, width = 48, options = {}) {
       write(String(line.character || '-').repeat(width))
       continue
     }
+    if (line?.type === 'logo') {
+      if (!logo?.data?.length) continue
+      // Center the raster with a rough space pad (12 dots per character at 203 dpi).
+      const leftPadDots = Math.max(
+        0,
+        Math.round((Number(printableDots) - Number(logo.widthDots || 0)) / 2)
+      )
+      const padSpaces = Math.max(0, Math.round(leftPadDots / Math.max(1, Number(dotsPerChar))))
+      chunks.push(ESC, 0x61, 0x00)
+      if (padSpaces > 0) write(' '.repeat(padSpaces))
+      chunks.push(GS, 0x76, 0x30, 0x00)
+      chunks.push(logo.bytesPerRow & 0xff, (logo.bytesPerRow >> 8) & 0xff)
+      chunks.push(logo.heightDots & 0xff, (logo.heightDots >> 8) & 0xff)
+      writeBuffer(logo.data)
+      chunks.push(0x0a)
+      continue
+    }
 
     chunks.push(ESC, 0x61, alignment(line?.align), ESC, 0x45, line?.bold ? 1 : 0, ESC, 0x2d, 0)
     for (const value of wrapText(line?.text ?? '', width)) write(value)
@@ -61,7 +93,8 @@ export function escPosBytes(lines, width = 48, options = {}) {
 
   for (let index = 0; index < feed; index += 1) write('')
   if (cut) chunks.push(GS, 0x56, 0x41, 3)
-  return Buffer.from(chunks)
+  if (chunks.length > 0) parts.push(Buffer.from(chunks))
+  return Buffer.concat(parts)
 }
 
 export function sendNetwork(profile, data) {
@@ -118,11 +151,19 @@ function escapeHtml(value) {
   )
 }
 
-export function receiptLinesToHtml(lines, printer) {
+export function receiptLinesToHtml(lines, printer, logoDataUrl = '') {
   const paperWidth = Number(printer.paperWidthMm) || 80
   const printableWidth = Number(printer.printableWidthMm) || paperWidth - 8
   const body = lines
     .map((line) => {
+      if (line?.type === 'logo') {
+        return logoDataUrl
+          ? `<img src="${logoDataUrl}" alt="" style="display:block;margin:0 auto 6px;max-width:70%">`
+          : ''
+      }
+      if (line?.type === 'divider') {
+        return '<div style="border-bottom:1px dashed #000;height:0;margin:4px 0"></div>'
+      }
       const text = escapeHtml(line.text)
       const align = line.align === 'center' ? 'center' : line.align === 'right' ? 'right' : 'left'
       const weight = line.bold ? 700 : 400

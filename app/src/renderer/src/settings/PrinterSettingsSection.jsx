@@ -18,6 +18,7 @@ function PrinterSettingsSection({
       paperWidthMm: Number(initialData.paperWidthMm) || 80,
       printableWidthMm: Number(initialData.printableWidthMm) || 72,
       characterWidth: Number(initialData.characterWidth) || 48,
+      dotDensity: Number(initialData.dotDensity) || 8,
       encoding: initialData.encoding || 'CP437',
       cutAfterPrint: initialData.cutAfterPrint ?? true,
       feedLinesAfterPrint: Number(initialData.feedLinesAfterPrint) || 0,
@@ -144,6 +145,15 @@ function PrinterSettingsSection({
                 max={100}
                 key={form.key('characterWidth')}
                 {...form.getInputProps('characterWidth')}
+              />
+              <NumberInput
+                label="Dot density"
+                description="dots per mm (8 = 203 dpi)"
+                min={4}
+                max={16}
+                step={0.1}
+                key={form.key('dotDensity')}
+                {...form.getInputProps('dotDensity')}
               />
             </Group>
             <Select

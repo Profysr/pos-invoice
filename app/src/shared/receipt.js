@@ -1,4 +1,10 @@
-import { calculateInvoiceTotals, formatMoney, formatQuantityMilli } from './invoice.js'
+import { formatReceiptDate, formatReceiptTime, groupTrackingNumber } from './dates.js'
+import { formatMoney } from './invoice.js'
+
+const FOOTER_TRACKING =
+  'Text your tracking number to 28777 (2USPS) to get the latest status.Standard Message and Date Rates may apply.You may also visit www.usps.com USPS Tracking or call 1-800-222-1811.'
+const FOOTER_INSURANCE =
+  'Save this receipt as evidence of insurance. For information on filing an insurance claim go to https://www.usps.com/help/claims.htm or call 1-800-222-1811.'
 
 export function wrapText(input, width) {
   const safeWidth = Math.max(1, Number(width) || 48)
@@ -35,84 +41,108 @@ function formatColumns(left, right, width) {
   return `${leftText.slice(0, leftWidth).padEnd(leftWidth)} ${rightText}`
 }
 
+// Product | Qty | Unit Price | Price, padded for the printer's character grid.
+function formatTableRow(cells, width) {
+  const productEnd = Math.round(width * 0.4)
+  const qtyEnd = Math.max(productEnd + 5, Math.round(width * 0.5))
+  const unitEnd = Math.max(qtyEnd + 10, Math.round(width * 0.8))
+  const part = (value, from, to, align) => {
+    const size = Math.max(0, to - from)
+    const text = String(value ?? '').slice(0, size)
+    return align === 'right' ? text.padStart(size) : text.padEnd(size)
+  }
+  return (
+    part(cells[0], 0, productEnd, 'left') +
+    part(cells[1], productEnd, qtyEnd, 'right') +
+    part(cells[2], qtyEnd, unitEnd, 'right') +
+    part(cells[3], unitEnd, width, 'right')
+  ).trimEnd()
+}
+
 function optionalLine(lines, text, align = 'left', bold = false) {
   const value = String(text ?? '').trim()
   if (value) lines.push({ text: value, align, bold })
 }
 
-export function buildReceiptLines({ invoice, company = {}, printer = {} }) {
-  const width = Math.max(16, Number(printer.characterWidth) || 48)
-  const currency = invoice.currency || company.defaultCurrency || 'USD'
-  const totals = calculateInvoiceTotals(invoice.items || [], invoice.insurance || 0)
+/**
+ * Shipping receipt template (single template for the whole app).
+ *
+ * Canonical line model consumed by the live preview, the ESC/POS encoder and
+ * the Windows system-print path:
+ * - { text, align: 'left'|'center'|'right', bold }
+ * - { type: 'divider', character }  dashed rule
+ * - { type: 'logo' }                the logo raster, resolved by each consumer
+ */
+export function buildShippingReceiptLines({ receipt = {}, company = {}, printer = {} }) {
+  const width = Math.max(24, Number(printer.characterWidth) || 48)
+  const currency = receipt.currency || company.defaultCurrency || 'USD'
   const money = (minorUnits) => formatMoney(minorUnits, currency)
+  const price = Number(receipt.subtotal) || 0
+  const insurance = Number(receipt.insurance) || 0
+  const total = price + insurance
   const lines = []
 
-  optionalLine(lines, company.name, 'center', true)
-  optionalLine(lines, company.address, 'center')
-  optionalLine(lines, company.phone ? `Tel: ${company.phone}` : '', 'center')
-  optionalLine(lines, company.email, 'center')
-  lines.push({ text: '', align: 'left' })
+  if (company.logoPath || company.logoDataUrl) lines.push({ type: 'logo' })
 
-  lines.push({ text: formatColumns('Invoice:', invoice.invoiceNumber, width), align: 'left' })
+  for (const line of String(receipt.shippingFrom ?? '').split('\n')) {
+    optionalLine(lines, line.trim(), 'center')
+  }
+
+  lines.push({ type: 'divider', character: '-' })
   lines.push({
     text: formatColumns(
-      'Date:',
-      [invoice.invoiceDate, invoice.invoiceTime].filter(Boolean).join(' '),
+      formatReceiptDate(receipt.invoiceDate),
+      formatReceiptTime(receipt.invoiceTime),
       width
     ),
     align: 'left'
   })
-  optionalLine(lines, formatColumns('Customer:', invoice.customerName, width))
-  optionalLine(lines, formatColumns('Phone:', invoice.customerPhone, width))
-  optionalLine(lines, formatColumns('Address:', invoice.customerAddress, width))
-  lines.push({ text: '-'.repeat(width), align: 'left' })
-
-  for (const item of totals.items) {
-    for (const text of wrapText(item.description, width)) {
-      lines.push({ text, align: 'left' })
-    }
-    lines.push({
-      text: formatColumns(
-        `x${formatQuantityMilli(item.quantityMilli)} @ ${money(item.unitPrice)}`,
-        money(item.lineTotal),
-        width
-      ),
-      align: 'left'
-    })
-  }
-
-  lines.push({ text: '-'.repeat(width), align: 'left' })
+  lines.push({ type: 'divider', character: '-' })
   lines.push({
-    text: formatColumns('Subtotal', money(totals.subtotal), width),
-    align: 'left'
-  })
-  if (totals.insurance > 0) {
-    lines.push({
-      text: formatColumns('Insurance', money(totals.insurance), width),
-      align: 'left'
-    })
-  }
-  lines.push({
-    text: formatColumns('TOTAL', money(totals.total), width),
-    align: 'center',
+    text: formatTableRow(['Product', 'Qty', 'Unit Price', 'Price'], width),
+    align: 'left',
     bold: true
   })
-  lines.push({ text: '-'.repeat(width), align: 'left' })
+  lines.push({ type: 'divider', character: '-' })
 
-  optionalLine(lines, formatColumns('Shipping:', invoice.shippingService, width))
-  optionalLine(lines, formatColumns('Destination:', invoice.destinationAddress, width))
-  optionalLine(lines, formatColumns('Weight:', invoice.packageWeight, width))
-  optionalLine(lines, formatColumns('Delivery:', invoice.expectedDeliveryDate, width))
-  optionalLine(lines, formatColumns('Tracking:', invoice.trackingNumber, width))
+  lines.push({
+    text: formatTableRow(
+      [receipt.shippingService || 'Prepaid Mail', '1', '', money(price)],
+      width
+    ),
+    align: 'left'
+  })
 
-  if (invoice.notes) {
-    lines.push({ text: 'Notes:', align: 'left', bold: true })
-    for (const text of wrapText(invoice.notes, width)) {
-      lines.push({ text, align: 'left' })
-    }
+  optionalLine(lines, receipt.destinationAddress ? `  ${receipt.destinationAddress}` : '')
+  optionalLine(lines, receipt.packageWeight ? `  Weight: ${receipt.packageWeight}` : '')
+
+  lines.push({ text: 'Expected Delivery Date:', align: 'left' })
+  optionalLine(lines, formatReceiptDate(receipt.expectedDeliveryDate) ? `  ${formatReceiptDate(receipt.expectedDeliveryDate)}` : '')
+  lines.push({ text: 'Tracking #:', align: 'left' })
+  optionalLine(lines, groupTrackingNumber(receipt.trackingNumber) ? `  ${groupTrackingNumber(receipt.trackingNumber)}` : '')
+
+  if (receipt.insuranceLabel || insurance > 0) {
+    lines.push({
+      text: formatColumns(receipt.insuranceLabel || 'Insurance', money(insurance), width),
+      align: 'left'
+    })
   }
 
-  lines.push({ text: '', align: 'left' })
-  lines.push({ text: 'Thank you for your business', align: 'center', bold: true })
+  lines.push({ text: formatColumns('Total', money(total), width), align: 'left' })
+  lines.push({ type: 'divider', character: '-' })
+  lines.push({
+    text: formatColumns('Grand Total:', money(total), width),
+    align: 'left',
+    bold: true
+  })
+  lines.push({ type: 'divider', character: '-' })
+
+  for (const paragraph of [FOOTER_TRACKING, FOOTER_INSURANCE]) {
+    for (const text of wrapText(paragraph, width)) {
+      lines.push({ text, align: 'center' })
+    }
+    lines.push({ text: '', align: 'left' })
+  }
+
   return lines
 }

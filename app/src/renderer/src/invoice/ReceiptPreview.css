@@ -29,6 +29,19 @@
   white-space: pre-wrap;
 }
 
+.receipt-logo {
+  display: block;
+  margin: 0 auto 6px;
+  max-width: 70%;
+  height: auto;
+}
+
+.receipt-divider {
+  border-bottom: 1px dashed var(--mantine-color-text);
+  height: 0;
+  margin: 3px 0;
+}
+
 .receipt-line.align-left {
   text-align: left;
 }

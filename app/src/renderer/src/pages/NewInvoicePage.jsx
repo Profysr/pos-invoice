@@ -4,18 +4,14 @@ import { Alert, Button, Flex, Loader, ScrollArea } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconAlertCircle } from '@tabler/icons-react'
 import InvoiceForm from '../invoice/InvoiceForm.jsx'
-import LineItemsEditor from '../invoice/LineItemsEditor.jsx'
 import ReceiptPreview from '../invoice/ReceiptPreview.jsx'
 import {
-  calculateInvoiceTotals,
-  calculateLineTotal,
-  formatMoney,
-  normalizeInvoiceDraft,
+  normalizeShippingReceiptDraft,
   parseMoneyToMinorUnits,
-  parseQuantityToMilli,
-  storedInvoiceToDraft
+  storedShippingReceiptToDraft
 } from '../../../shared/invoice.js'
-import { buildReceiptLines } from '../../../shared/receipt.js'
+import { buildShippingReceiptLines } from '../../../shared/receipt.js'
+import { DEFAULT_SHIPPING_SERVICE } from '../../../shared/shipping-services.js'
 
 function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `row-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -24,29 +20,27 @@ function createId() {
 function localDateParts(date = new Date()) {
   const pad = (value) => String(value).padStart(2, '0')
   return {
-    invoiceDate: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-    invoiceTime: `${pad(date.getHours())}:${pad(date.getMinutes())}`
+    date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    time: `${pad(date.getHours())}:${pad(date.getMinutes())}`
   }
 }
 
 function createInitialValues(bootstrap) {
   const now = localDateParts()
   return {
-    customerName: '',
-    customerPhone: '',
-    customerAddress: '',
     invoiceNumber: bootstrap?.invoiceNumber || '',
-    invoiceDate: bootstrap?.invoiceDate || now.invoiceDate,
-    invoiceTime: bootstrap?.invoiceTime || now.invoiceTime,
-    currency: bootstrap?.company?.defaultCurrency || 'USD',
-    insurance: '',
-    shippingService: '',
-    destinationAddress: '',
-    packageWeight: '',
-    expectedDeliveryDate: '',
+    date: now.date,
+    time: now.time,
     trackingNumber: '',
-    notes: '',
-    items: [{ id: createId(), description: '', qty: '', unitPrice: '' }]
+    price: '',
+    shippingFrom: '',
+    expectedDeliveryDate: '',
+    service: DEFAULT_SHIPPING_SERVICE,
+    destination: '',
+    weight: '',
+    insuranceLabel: '',
+    insuranceAmount: '',
+    currency: bootstrap?.company?.defaultCurrency || 'USD'
   }
 }
 
@@ -58,129 +52,74 @@ function safeMoney(value) {
   }
 }
 
-function safeQuantity(value) {
-  try {
-    return parseQuantityToMilli(value)
-  } catch {
-    return null
-  }
-}
-
 function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
-  const initialValues = editInvoice?.items?.length
-    ? { ...createInitialValues(bootstrap), ...storedInvoiceToDraft(editInvoice) }
+  const initialValues = editInvoice
+    ? { ...createInitialValues(bootstrap), ...storedShippingReceiptToDraft(editInvoice) }
     : createInitialValues(bootstrap)
 
   const form = useForm({
     mode: 'uncontrolled',
     initialValues,
     validate: {
-      customerName: (value) => (value.trim().length > 0 ? null : 'Customer name is required'),
-      invoiceNumber: (value) => (value.trim().length > 0 ? null : 'Invoice number is required'),
-      invoiceDate: (value) => (value.trim().length > 0 ? null : 'Invoice date is required'),
-      invoiceTime: (value) => (value.trim().length > 0 ? null : 'Invoice time is required'),
-      currency: (value) => (/^[A-Za-z]{3}$/.test(value.trim()) ? null : 'Use a three-letter currency code')
+      date: (value) => (value.trim().length > 0 ? null : 'Date is required'),
+      time: (value) => (value.trim().length > 0 ? null : 'Time is required'),
+      trackingNumber: (value) => (value.trim().length > 0 ? null : 'Tracking number is required'),
+      price: (value) => {
+        if (value.trim().length === 0) return 'Price is required'
+        try {
+          parseMoneyToMinorUnits(value, 'Price')
+          return null
+        } catch (error) {
+          return error instanceof Error ? error.message : 'Price is invalid'
+        }
+      },
+      shippingFrom: (value) =>
+        value.trim().length > 0 ? null : 'Shipping from is required'
     }
   })
   const [invoiceId, setInvoiceId] = useState(() => editInvoice?.id ?? createId())
   const [printing, setPrinting] = useState(false)
 
-  const rows = useMemo(() => form.values.items ?? [], [form.values])
-  const currency = form.values.currency || bootstrap.company?.defaultCurrency || 'USD'
+  const receipt = useMemo(() => {
+    const values = form.values
+    const price = safeMoney(values.price)
+    const insurance = safeMoney(values.insuranceAmount)
+    return {
+      invoiceDate: values.date,
+      invoiceTime: values.time,
+      trackingNumber: values.trackingNumber,
+      subtotal: price,
+      insurance,
+      total: price + insurance,
+      shippingFrom: values.shippingFrom,
+      shippingService: values.service,
+      destinationAddress: values.destination,
+      packageWeight: values.weight,
+      expectedDeliveryDate: values.expectedDeliveryDate,
+      insuranceLabel: values.insuranceLabel,
+      currency: values.currency
+    }
+  }, [form.values])
 
-  const addRow = useCallback(() => {
-    form.insertListItem('items', {
-      id: createId(),
-      description: '',
-      qty: '',
-      unitPrice: ''
-    })
-  }, [form])
-
-  const handleRowsChange = useCallback(
-    (nextRows) => {
-      form.setValues((current) => ({ ...current, items: nextRows }))
-    },
-    [form]
-  )
-
-  const normalizedRows = useMemo(
+  const receiptLines = useMemo(
     () =>
-      rows.map((row) => {
-        const quantityMilli = safeQuantity(row.qty)
-        if (quantityMilli == null) return null
-        try {
-          return {
-            id: row.id,
-            description: row.description.trim(),
-            quantityMilli,
-            unitPrice: parseMoneyToMinorUnits(row.unitPrice, 'Unit price')
-          }
-        } catch {
-          return null
-        }
+      buildShippingReceiptLines({
+        receipt,
+        company: bootstrap.company || {},
+        printer: bootstrap.printer || { characterWidth: 48, paperWidthMm: 80 }
       }),
-    [rows]
+    [receipt, bootstrap]
   )
-
-  const insuranceMinor = useMemo(() => safeMoney(form.values.insurance), [form.values.insurance])
-
-  const totals = useMemo(() => {
-    const validItems = normalizedRows.filter(Boolean)
-    if (validItems.length === 0) return { items: [], subtotal: 0, insurance: insuranceMinor, total: insuranceMinor }
-    return calculateInvoiceTotals(validItems, insuranceMinor)
-  }, [normalizedRows, insuranceMinor])
-
-  const lineTotals = useMemo(
-    () =>
-      rows.map((row, index) => {
-        const item = normalizedRows[index]
-        if (!item) return '—'
-        return formatMoney(calculateLineTotal(item.quantityMilli, item.unitPrice), currency)
-      }),
-    [rows, normalizedRows, currency]
-  )
-
-  const lineErrors = useMemo(() => {
-    const map = {}
-    Object.entries(form.errors ?? {}).forEach(([path, message]) => {
-      const match = path.match(/^items\.(\d+)\.(.+)$/)
-      if (match) {
-        const row = rows[Number(match[1])]
-        if (row) map[row.id] = { ...(map[row.id] || {}), [match[2]]: message }
-      }
-    })
-    return map
-  }, [form.errors, rows])
-
-  const receiptLines = useMemo(() => {
-    const validItems = normalizedRows.filter(Boolean)
-    const receiptItems =
-      validItems.length > 0
-        ? validItems
-        : [{ description: 'No items yet', quantityMilli: 1000, unitPrice: 0 }]
-    const receiptTotals = calculateInvoiceTotals(receiptItems, insuranceMinor)
-    return buildReceiptLines({
-      invoice: {
-        ...form.values,
-        items: receiptItems,
-        insurance: insuranceMinor,
-        subtotal: receiptTotals.subtotal,
-        total: receiptTotals.total
-      },
-      company: bootstrap.company || {},
-      printer: bootstrap.printer || { characterWidth: 48, paperWidthMm: 80 }
-    })
-  }, [form.values, normalizedRows, insuranceMinor, bootstrap])
 
   const paperWidth = Number(bootstrap.printer?.paperWidthMm) || 80
+  const characterWidth = Number(bootstrap.printer?.characterWidth) || 48
 
   const handlePrint = useCallback(async () => {
     const validation = form.validate()
     if (validation.hasErrors) {
       notifications.show({
         color: 'red',
-        title: 'Check the invoice',
+        title: 'Check the receipt',
         message: 'Complete the required fields before printing.'
       })
       return
@@ -188,11 +127,11 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
 
     let payload
     try {
-      payload = normalizeInvoiceDraft(form.getValues(), invoiceId)
+      payload = normalizeShippingReceiptDraft(form.getValues(), invoiceId)
     } catch (error) {
       notifications.show({
         color: 'red',
-        title: 'Invoice is not ready',
+        title: 'Receipt is not ready',
         message: error instanceof Error ? error.message : String(error)
       })
       return
@@ -206,7 +145,7 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
       if (result.print.status === 'succeeded') {
         notifications.show({
           color: 'green',
-          title: 'Invoice saved and sent',
+          title: 'Receipt saved and sent',
           message: `${result.print.printerName}: ${result.print.message}`
         })
       } else {
@@ -227,16 +166,6 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
     }
   }, [form, invoiceId])
 
-  const lineItemsSlot = (
-    <LineItemsEditor
-      rows={rows}
-      lineTotals={lineTotals}
-      errors={lineErrors}
-      onChange={handleRowsChange}
-      addRow={addRow}
-    />
-  )
-
   return (
     <Flex gap="sm" mih={0} style={{ height: '100%' }}>
       <Flex
@@ -248,12 +177,9 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
       >
         <InvoiceForm
           form={form}
-          title={editInvoice ? 'Edit invoice' : 'New invoice'}
+          title={editInvoice ? 'Edit receipt' : 'New receipt'}
           onPrint={handlePrint}
           printing={printing}
-          lineItemsSlot={lineItemsSlot}
-          totals={totals}
-          currency={currency}
         />
       </Flex>
 
@@ -263,7 +189,12 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
         style={{ flex: '1 1 auto', minWidth: 0, alignSelf: 'stretch' }}
       >
         <ScrollArea style={{ width: '100%' }} offsetScrollbars="y">
-          <ReceiptPreview receiptLines={receiptLines} paperWidth={paperWidth} />
+          <ReceiptPreview
+            receiptLines={receiptLines}
+            paperWidth={paperWidth}
+            characterWidth={characterWidth}
+            logoDataUrl={bootstrap.company?.logoDataUrl || ''}
+          />
         </ScrollArea>
       </Flex>
     </Flex>
@@ -300,7 +231,7 @@ function NewInvoicePage({ editInvoice = null }) {
       <Alert
         color="red"
         icon={<IconAlertCircle size={16} />}
-        title="Could not load the invoice workspace"
+        title="Could not load the receipt workspace"
       >
         {error}
         <Button

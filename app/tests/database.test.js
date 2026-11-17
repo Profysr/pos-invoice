@@ -25,7 +25,7 @@ test('initializes user-data paths and applies database migrations', (t) => {
   assert.equal(existsSync(paths.database), true)
   assert.equal(existsSync(paths.uploads), true)
   assert.equal(existsSync(paths.backups), true)
-  assert.equal(store.getVersion(), 1)
+  assert.equal(store.getVersion(), 2)
 })
 
 test('stores settings, company metadata, and printer profiles', (t) => {
@@ -53,9 +53,11 @@ test('stores settings, company metadata, and printer profiles', (t) => {
     paperWidthMm: 80,
     printableWidthMm: 72,
     characterWidth: 48,
+    dotDensity: 8,
     encoding: 'CP437'
   })
   assert.equal(printer.networkPort, 9100)
+  assert.equal(printer.dotDensity, 8)
   assert.equal(store.getPrinter('printer-1').name, 'Network Receipt Printer')
   assert.equal(store.listPrinters().length, 1)
 })
@@ -69,7 +71,10 @@ test('saves, calculates, updates, lists, and deletes an invoice', (t) => {
     invoiceTime: '10:30',
     customerName: 'Sample Customer',
     currency: 'usd',
-    insurance: 250
+    insurance: 250,
+    shippingFrom: 'DE MOSS\nDE 5800 Corporate Dr Houston',
+    insuranceLabel: 'Up to $100.00 included',
+    trackingNumber: '9201990367007536409945'
   }
   const items = [
     {
@@ -85,6 +90,9 @@ test('saves, calculates, updates, lists, and deletes an invoice', (t) => {
   assert.equal(saved.subtotal, 1500)
   assert.equal(saved.total, 1750)
   assert.equal(saved.currency, 'USD')
+  assert.equal(saved.shippingFrom, 'DE MOSS\nDE 5800 Corporate Dr Houston')
+  assert.equal(saved.insuranceLabel, 'Up to $100.00 included')
+  assert.equal(saved.trackingNumber, '9201990367007536409945')
 
   const updated = store.saveInvoice({ ...invoice, insurance: 500 }, [
     { ...items[0], quantityMilli: 2000, unitPrice: 1250 }

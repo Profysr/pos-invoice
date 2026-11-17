@@ -22,8 +22,12 @@ import {
   IconSearch,
   IconTrash
 } from '@tabler/icons-react'
-import { formatMoney, normalizeInvoiceDraft, storedInvoiceToDraft } from '../../../shared/invoice.js'
-import { buildReceiptLines } from '../../../shared/receipt.js'
+import {
+  formatMoney,
+  normalizeShippingReceiptDraft,
+  storedShippingReceiptToDraft
+} from '../../../shared/invoice.js'
+import { buildShippingReceiptLines } from '../../../shared/receipt.js'
 import ReceiptPreview from '../invoice/ReceiptPreview.jsx'
 import './SavedInvoicesPage.css'
 
@@ -81,7 +85,8 @@ function SavedInvoicesPage({ onEdit }) {
     return invoices.filter(
       (invoice) =>
         invoice.invoiceNumber.toLowerCase().includes(query) ||
-        invoice.customerName.toLowerCase().includes(query)
+        (invoice.trackingNumber || '').toLowerCase().includes(query) ||
+        (invoice.destinationAddress || '').toLowerCase().includes(query)
     )
   }, [invoices, search])
 
@@ -94,8 +99,8 @@ function SavedInvoicesPage({ onEdit }) {
 
   const viewingReceipt = useMemo(() => {
     if (!viewing?.invoice) return []
-    return buildReceiptLines({
-      invoice: viewing.invoice,
+    return buildShippingReceiptLines({
+      receipt: viewing.invoice,
       company: viewing.company || {},
       printer: viewing.printer || {}
     })
@@ -129,12 +134,15 @@ function SavedInvoicesPage({ onEdit }) {
 
   const handlePrint = guard(async (row) => {
     const invoice = await window.invoiceApi.getInvoice(row.id)
-    const payload = normalizeInvoiceDraft(storedInvoiceToDraft(invoice), invoice.id)
+    const payload = normalizeShippingReceiptDraft(
+      storedShippingReceiptToDraft(invoice),
+      invoice.id
+    )
     const result = await window.invoiceApi.printInvoice(payload)
     refresh()
     notifications.show({
       color: result.print.status === 'succeeded' ? 'green' : 'red',
-      title: result.print.status === 'succeeded' ? 'Invoice printed' : 'Print failed',
+      title: result.print.status === 'succeeded' ? 'Receipt printed' : 'Print failed',
       message: `${result.print.printerName}: ${result.print.message}`
     })
   })
@@ -144,7 +152,7 @@ function SavedInvoicesPage({ onEdit }) {
     await window.invoiceApi.deleteInvoice(deleting.id)
     notifications.show({
       color: 'green',
-      title: 'Invoice deleted',
+      title: 'Receipt deleted',
       message: `${deleting.invoiceNumber} was removed.`
     })
     setDeleting(null)
@@ -153,11 +161,7 @@ function SavedInvoicesPage({ onEdit }) {
 
   if (loadError) {
     return (
-      <Alert
-        color="red"
-        icon={<IconAlertCircle size={16} />}
-        title="Could not load saved invoices"
-      >
+      <Alert color="red" icon={<IconAlertCircle size={16} />} title="Could not load saved receipts">
         {loadError}
         <Button variant="light" size="xs" mt="sm" onClick={refresh}>
           Retry
@@ -170,7 +174,7 @@ function SavedInvoicesPage({ onEdit }) {
     <Paper withBorder p="md" radius="sm" className="saved-invoices-panel">
       <Group justify="space-between" gap="sm" mb="sm" wrap="nowrap">
         <TextInput
-          placeholder="Search invoice # or customer"
+          placeholder="Search reference, tracking or destination"
           value={search}
           onChange={(event) => {
             setSearch(event.currentTarget.value)
@@ -181,23 +185,26 @@ function SavedInvoicesPage({ onEdit }) {
           className="saved-invoices-search"
         />
         <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-          {filtered.length} invoice{filtered.length === 1 ? '' : 's'}
+          {filtered.length} receipt{filtered.length === 1 ? '' : 's'}
         </Text>
       </Group>
 
       {pageRows.length === 0 ? (
         <Text size="sm" c="dimmed" py="lg" ta="center">
-          {invoices.length === 0 ? 'No invoices yet' : `No invoices match "${search.trim()}"`}
+          {invoices.length === 0
+            ? 'No receipts yet'
+            : `No receipts match "${search.trim()}"`}
         </Text>
       ) : (
         <>
           <Table highlightOnHover verticalSpacing="xs" horizontalSpacing="sm">
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Invoice #</Table.Th>
+                <Table.Th>Reference #</Table.Th>
                 <Table.Th>Date</Table.Th>
-                <Table.Th>Customer</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Total</Table.Th>
+                <Table.Th>Tracking #</Table.Th>
+                <Table.Th>Destination</Table.Th>
+                <Table.Th style={{ textAlign: 'right' }}>Price</Table.Th>
                 <Table.Th>Print status</Table.Th>
                 <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
               </Table.Tr>
@@ -209,7 +216,8 @@ function SavedInvoicesPage({ onEdit }) {
                   <Table.Tr key={invoice.id}>
                     <Table.Td className="saved-invoices-number">{invoice.invoiceNumber}</Table.Td>
                     <Table.Td>{invoice.invoiceDate}</Table.Td>
-                    <Table.Td>{invoice.customerName}</Table.Td>
+                    <Table.Td>{invoice.trackingNumber}</Table.Td>
+                    <Table.Td>{invoice.destinationAddress}</Table.Td>
                     <Table.Td style={{ textAlign: 'right' }}>
                       {formatMoney(invoice.total, invoice.currency)}
                     </Table.Td>
@@ -294,7 +302,7 @@ function SavedInvoicesPage({ onEdit }) {
       <Modal
         opened={Boolean(viewing)}
         onClose={() => setViewing(null)}
-        title={viewing?.invoice?.invoiceNumber || 'Invoice'}
+        title={viewing?.invoice?.invoiceNumber || 'Receipt'}
         size={440}
         centered
       >
@@ -302,6 +310,8 @@ function SavedInvoicesPage({ onEdit }) {
           <ReceiptPreview
             receiptLines={viewingReceipt}
             paperWidth={Number(viewing.printer?.paperWidthMm) || 80}
+            characterWidth={Number(viewing.printer?.characterWidth) || 48}
+            logoDataUrl={viewing.company?.logoDataUrl || ''}
           />
         )}
       </Modal>
@@ -309,13 +319,13 @@ function SavedInvoicesPage({ onEdit }) {
       <Modal
         opened={Boolean(deleting)}
         onClose={() => setDeleting(null)}
-        title="Delete invoice?"
+        title="Delete receipt?"
         size="sm"
         centered
       >
         <Text size="sm">
-          {deleting?.invoiceNumber} and its line items will be permanently removed. This cannot be
-          undone.
+          {deleting?.invoiceNumber} and its stored details will be permanently removed. This cannot
+          be undone.
         </Text>
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={() => setDeleting(null)}>
