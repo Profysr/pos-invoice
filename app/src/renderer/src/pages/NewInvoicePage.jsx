@@ -98,10 +98,10 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
           return error instanceof Error ? error.message : 'Insurance amount is invalid'
         }
       }
-      // shippingFrom is not a form field anymore — it comes from company
-      // settings; an empty block surfaces through normalizeShippingReceiptDraft.
+      // shippingFrom is not a form field anymore — it comes from company settings; an empty block surfaces through normalizeShippingReceiptDraft.
     }
   })
+  
   const [invoiceId, setInvoiceId] = useState(() => editInvoice?.id ?? createId())
   const [printing, setPrinting] = useState(false)
 
