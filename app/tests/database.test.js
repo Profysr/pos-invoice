@@ -235,6 +235,48 @@ test('enforces invoice-number uniqueness and records print history', (t) => {
 
   assert.equal(store.listPrintHistory('invoice-1').length, 1)
   assert.equal(store.listPrintHistory('invoice-1')[0].status, 'succeeded')
+
+  store.setInvoicePrintStatus('invoice-1', 'printing')
+  assert.throws(
+    () =>
+      store.recordPrintResult({
+        id: 'print-1',
+        invoiceId: 'invoice-1',
+        printerId: 'printer-1',
+        printerName: 'Network Receipt Printer',
+        connectionMethod: 'network',
+        status: 'failed'
+      }),
+    /UNIQUE constraint failed/
+  )
+  assert.equal(store.getInvoice('invoice-1').printStatus, 'printing')
+  assert.equal(store.listPrintHistory('invoice-1').length, 1)
+
+  store.recordPrintResult({
+    id: 'print-2',
+    invoiceId: 'invoice-1',
+    printerId: 'printer-1',
+    printerName: 'Network Receipt Printer',
+    connectionMethod: 'network',
+    status: 'failed',
+    errorMessage: 'Printer offline'
+  })
+  assert.equal(store.getInvoice('invoice-1').printStatus, 'failed')
+  assert.equal(store.listPrintHistory('invoice-1').length, 2)
+  assert.equal(store.listPrintHistory('invoice-1')[0].status, 'failed')
+  assert.throws(
+    () =>
+      store.recordPrintResult({
+        id: 'print-3',
+        invoiceId: 'invoice-1',
+        printerId: 'printer-1',
+        printerName: 'Network Receipt Printer',
+        connectionMethod: 'network',
+        status: 'succeeded'
+      }),
+    /Invoice must be printing to record a print result/
+  )
+  assert.equal(store.listPrintHistory('invoice-1').length, 2)
 })
 
 test('generates unique invoice numbers and updates print status', (t) => {
@@ -262,11 +304,27 @@ test('generates unique invoice numbers and updates print status', (t) => {
   ]
 
   store.saveInvoice(invoice, items)
+  assert.throws(
+    () => store.setInvoicePrintStatus('invoice-status', 'succeeded'),
+    /Invalid invoice print status transition/
+  )
   assert.equal(store.setInvoicePrintStatus('invoice-status', 'printing'), true)
   assert.equal(store.getInvoice('invoice-status').printStatus, 'printing')
   assert.equal(store.setInvoicePrintStatus('invoice-status', 'succeeded'), true)
   assert.equal(store.getInvoice('invoice-status').printStatus, 'succeeded')
   assert.throws(() => store.setInvoicePrintStatus('invoice-status', 'printed'), /Invalid invoice print status/)
+  assert.throws(
+    () => store.setInvoicePrintStatus('invoice-status', 'not_printed'),
+    /Invalid invoice print status transition/
+  )
+
+  assert.equal(store.setInvoicePrintStatus('invoice-status', 'printing'), true)
+  assert.equal(store.failInterruptedPrints(), 1)
+  assert.equal(store.getInvoice('invoice-status').printStatus, 'failed')
+  assert.throws(
+    () => store.setInvoicePrintStatus('invoice-status', 'succeeded'),
+    /Invalid invoice print status transition/
+  )
 
   store.deleteInvoice('invoice-status')
   const afterDelete = store.nextInvoiceNumber()

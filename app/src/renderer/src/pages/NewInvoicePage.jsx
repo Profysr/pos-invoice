@@ -170,7 +170,7 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
       if (result.print.status === 'succeeded') {
         notifications.show({
           color: 'green',
-          title: 'Receipt saved and sent',
+          title: 'Receipt saved; print job sent',
           message: `${result.print.printerName}: ${result.print.message}`
         })
       } else {

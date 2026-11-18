@@ -236,25 +236,35 @@ function registerIpcHandlers() {
 
     const printer = database.getPrinter('default')
     if (!printer) {
-      database.setInvoicePrintStatus(saved.id, 'failed')
+      const message = 'Receipt saved, but no printer is configured. Open Settings and choose a printer.'
+      const fallbackPrinter = defaultPrinter()
+      database.recordPrintResult({
+        id: randomUUID(),
+        invoiceId: saved.id,
+        printerId: fallbackPrinter.id,
+        printerName: fallbackPrinter.name,
+        connectionMethod: fallbackPrinter.connectionType,
+        status: 'failed',
+        errorMessage: message
+      })
       return {
         invoice: database.getInvoice(saved.id),
         print: {
           status: 'failed',
-          message: 'Invoice saved, but no printer is configured. Open Settings and choose a printer.'
+          message
         }
       }
     }
 
-    const company = database.getCompany() || defaultCompany()
-    const logoPath = effectiveLogoPath(company)
-    const lines = buildShippingReceiptLines({
-      receipt: saved,
-      company: { ...company, logoPath },
-      printer
-    })
-
     try {
+      const company = database.getCompany() || defaultCompany()
+      const logoPath = effectiveLogoPath(company)
+      const lines = buildShippingReceiptLines({
+        receipt: saved,
+        company: { ...company, logoPath },
+        printer
+      })
+
       let result
       if (printer.connectionType === 'network') {
         const dotDensity = Number(printer.dotDensity) || 8
@@ -273,8 +283,7 @@ function registerIpcHandlers() {
         result = await printSystem(lines, printer, logoDataUrl)
       }
 
-      database.setInvoicePrintStatus(saved.id, 'succeeded')
-      database.addPrintHistory({
+      database.recordPrintResult({
         id: randomUUID(),
         invoiceId: saved.id,
         printerId: printer.id,
@@ -293,8 +302,7 @@ function registerIpcHandlers() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      database.setInvoicePrintStatus(saved.id, 'failed')
-      database.addPrintHistory({
+      database.recordPrintResult({
         id: randomUUID(),
         invoiceId: saved.id,
         printerId: printer.id,
@@ -322,6 +330,7 @@ app
     app.setAppUserModelId('com.invoicegenerator.desktop')
     paths = initializeUserData(app.getPath('userData'))
     database = createDatabaseStore(paths.database)
+    database.failInterruptedPrints()
     registerIpcHandlers()
     createWindow()
 

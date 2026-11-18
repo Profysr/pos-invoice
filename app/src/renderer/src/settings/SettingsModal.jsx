@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Modal } from '@mantine/core'
+import { Alert, Button, Flex, Loader, Modal } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconAlertCircle } from '@tabler/icons-react'
 import CompanyMetadataSection from './CompanyMetadataSection'
@@ -39,10 +39,13 @@ function SettingsModal({ opened, onClose }) {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
 
   // State is only updated inside promise callbacks, never synchronously in the effect.
   const load = useCallback(() => {
+    setLoading(true)
+    setError('')
     const request = window.invoiceApi
       ? Promise.all([
           window.invoiceApi.getCompany(),
@@ -56,15 +59,15 @@ function SettingsModal({ opened, onClose }) {
         setCompany(nextCompany || defaultCompany)
         setPrinter(nextPrinter || defaultPrinter)
         setSystemPrinters(printers || [])
-        setError('')
       })
       .catch((loadError) => {
         setError(loadError instanceof Error ? loadError.message : String(loadError))
       })
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
-    if (opened) void load()
+    if (opened) void Promise.resolve().then(load)
   }, [opened, load])
 
   const handleCompanySave = async (values) => {
@@ -117,13 +120,13 @@ function SettingsModal({ opened, onClose }) {
       const result = await window.invoiceApi.testPrinter(values)
       notifications.show({
         color: result.ok ? 'green' : 'red',
-        title: result.ok ? 'Printer test succeeded' : 'Printer test failed',
+        title: result.ok ? 'Printer test job succeeded' : 'Printer test job failed',
         message: result.message
       })
     } catch (testError) {
       notifications.show({
         color: 'red',
-        title: 'Printer test failed',
+        title: 'Printer test job failed',
         message: testError instanceof Error ? testError.message : String(testError)
       })
     } finally {
@@ -132,6 +135,10 @@ function SettingsModal({ opened, onClose }) {
   }
 
   const handleChooseLogo = () => window.invoiceApi.chooseLogo()
+  const handleClose = () => {
+    setLoading(true)
+    onClose()
+  }
 
   const sections = [
     { id: 'company', label: 'Company Metadata' },
@@ -141,7 +148,7 @@ function SettingsModal({ opened, onClose }) {
   return (
     <Modal
       opened={opened}
-      onClose={onClose}
+      onClose={handleClose}
       title="Settings"
       size={900}
       centered
@@ -166,7 +173,11 @@ function SettingsModal({ opened, onClose }) {
           ))}
         </nav>
         <div className="settings-section-area">
-          {error ? (
+          {loading ? (
+            <Flex justify="center" align="center" mih={240}>
+              <Loader size="sm" />
+            </Flex>
+          ) : error ? (
             <Alert color="red" icon={<IconAlertCircle size={16} />} title="Could not load settings">
               {error}
               <Button variant="light" size="xs" mt="sm" onClick={() => void load()}>

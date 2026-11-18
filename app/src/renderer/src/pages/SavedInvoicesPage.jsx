@@ -44,7 +44,7 @@ const printStatusBadge = {
   not_printed: { label: 'Not printed', color: 'gray' },
   queued: { label: 'Queued', color: 'blue' },
   printing: { label: 'Printing', color: 'blue' },
-  succeeded: { label: 'Printed', color: 'green' },
+  succeeded: { label: 'Sent', color: 'green' },
   failed: { label: 'Failed', color: 'red' }
 }
 
@@ -152,7 +152,7 @@ function SavedInvoicesPage({ onEdit }) {
       refresh()
       notifications.show({
         color: result.print.status === 'succeeded' ? 'green' : 'red',
-        title: result.print.status === 'succeeded' ? 'Receipt printed' : 'Print failed',
+        title: result.print.status === 'succeeded' ? 'Receipt sent' : 'Print failed',
         message: `${result.print.printerName}: ${result.print.message}`
       })
     } finally {

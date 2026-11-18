@@ -1,6 +1,6 @@
 # Invoice Generator
 
-Local-first Windows invoice and thermal receipt generator built with Electron, React, Mantine, and SQLite.
+This is a local Electron app that creates shipping receipts, stores them in SQLite, previews them, and prints them through either a Windows printer or a LAN ESC/POS printer. Local-first Windows invoice and thermal receipt generator built with Electron, React, Mantine, and SQLite.
 
 ## Requirements
 

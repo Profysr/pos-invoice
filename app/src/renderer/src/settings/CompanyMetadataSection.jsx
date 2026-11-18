@@ -28,8 +28,8 @@ function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = fa
     setChoosingLogo(true)
     try {
       const result = await onChooseLogo()
-      if (result?.path) {
-        form.setFieldValue('logoPath', result.path)
+      if (result?.logoPath) {
+        form.setFieldValue('logoPath', result.logoPath)
         setLogoDataUrl(result.logoDataUrl || null)
       }
     } finally {

@@ -3,6 +3,14 @@ import { dirname, extname, isAbsolute, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 const DEFAULT_PAGE_SIZE = 15
+const INVOICE_PRINT_STATUSES = ['not_printed', 'queued', 'printing', 'succeeded', 'failed']
+const INVOICE_PRINT_TRANSITIONS = {
+  not_printed: ['queued', 'printing'],
+  queued: ['printing', 'failed'],
+  printing: ['succeeded', 'failed'],
+  succeeded: ['printing'],
+  failed: ['printing']
+}
 
 const migrations = [
   {
@@ -120,6 +128,38 @@ function requiredText(value, field) {
     throw new Error(`${field} is required`)
   }
   return value.trim()
+}
+
+function updateInvoicePrintStatus(
+  database,
+  invoiceId,
+  status,
+  timestamp = now(),
+  requiredStatus = null
+) {
+  if (!INVOICE_PRINT_STATUSES.includes(status)) {
+    throw new Error('Invalid invoice print status')
+  }
+
+  const current = database
+    .prepare('SELECT print_status FROM invoices WHERE id = ?')
+    .get(invoiceId)?.print_status
+  if (!current) return false
+  if (requiredStatus && current !== requiredStatus) {
+    throw new Error(`Invoice must be ${requiredStatus} to record a print result`)
+  }
+  if (current !== status && !INVOICE_PRINT_TRANSITIONS[current]?.includes(status)) {
+    throw new Error(`Invalid invoice print status transition: ${current} -> ${status}`)
+  }
+
+  return (
+    database
+      .prepare(
+        `UPDATE invoices SET print_status = ?, updated_at = ?
+         WHERE id = ? AND print_status = ?`
+      )
+      .run(status, timestamp, invoiceId, current).changes > 0
+  )
 }
 
 function optionalText(value, field) {
@@ -646,13 +686,17 @@ export function createDatabaseStore(databasePath) {
 
     setInvoicePrintStatus(id, status) {
       const invoiceId = requiredText(id, 'Invoice id')
-      if (!['not_printed', 'queued', 'printing', 'succeeded', 'failed'].includes(status)) {
-        throw new Error('Invalid invoice print status')
-      }
+      return updateInvoicePrintStatus(database, invoiceId, status)
+    },
+
+    failInterruptedPrints() {
       return (
         database
-          .prepare('UPDATE invoices SET print_status = ?, updated_at = ? WHERE id = ?')
-          .run(status, now(), invoiceId).changes > 0
+          .prepare(
+            `UPDATE invoices SET print_status = 'failed', updated_at = ?
+             WHERE print_status = 'printing'`
+          )
+          .run(now()).changes
       )
     },
 
@@ -690,6 +734,58 @@ export function createDatabaseStore(databasePath) {
           errorMessage,
           printedAt
         )
+
+      return {
+        id,
+        invoiceId,
+        printerId,
+        printerName,
+        connectionMethod,
+        status,
+        errorMessage,
+        printedAt
+      }
+    },
+
+    recordPrintResult(input) {
+      const id = requiredText(input?.id, 'Print history id')
+      const invoiceId = requiredText(input?.invoiceId, 'Invoice id')
+      const printerId = input?.printerId ? optionalText(input.printerId, 'Printer id') : null
+      const printerName = requiredText(input?.printerName, 'Printer name')
+      const connectionMethod = requiredText(input?.connectionMethod, 'Connection method')
+      if (!['network', 'system'].includes(connectionMethod)) {
+        throw new Error('Connection method must be network or system')
+      }
+      const status = requiredText(input?.status, 'Print status')
+      if (!['succeeded', 'failed'].includes(status)) {
+        throw new Error('Print status must be succeeded or failed')
+      }
+      const errorMessage = input?.errorMessage
+        ? optionalText(input.errorMessage, 'Error message')
+        : null
+      const printedAt = now()
+
+      transaction(database, () => {
+        if (!updateInvoicePrintStatus(database, invoiceId, status, printedAt, 'printing')) {
+          throw new Error('Invoice not found')
+        }
+        database
+          .prepare(
+            `INSERT INTO print_history
+               (id, invoice_id, printer_id, printer_name, connection_method, status, error_message, printed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            id,
+            invoiceId,
+            printerId,
+            printerName,
+            connectionMethod,
+            status,
+            errorMessage,
+            printedAt
+          )
+      })
 
       return {
         id,

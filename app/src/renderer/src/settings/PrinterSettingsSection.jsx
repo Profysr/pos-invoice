@@ -146,6 +146,9 @@ function PrinterSettingsSection({
 
         <Divider />
 
+        <Text size="xs" c="dimmed">
+          Tests the values above, including unsaved changes. Save them before printing receipts.
+        </Text>
         <Group justify='flex-end'>
           <Button
             type="button"
@@ -153,7 +156,7 @@ function PrinterSettingsSection({
             loading={testing}
             onClick={() => void onTest(buildProfile(form.getValues()))}
           >
-            Test print
+            Test current settings
           </Button>
           <Button type="submit" loading={saving}>
             Save
