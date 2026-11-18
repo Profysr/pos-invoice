@@ -31,7 +31,7 @@ import { buildShippingReceiptLines } from '../../../shared/receipt.js'
 import ReceiptPreview from '../invoice/ReceiptPreview.jsx'
 import './SavedInvoicesPage.css'
 
-const ROWS_PER_PAGE_DEFAULT = 10
+const ROWS_PER_PAGE_DEFAULT = 15
 
 const printStatusBadge = {
   not_printed: { label: 'Not printed', color: 'gray' },

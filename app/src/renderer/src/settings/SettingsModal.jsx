@@ -122,7 +122,7 @@ function SettingsModal({ opened, onClose }) {
       opened={opened}
       onClose={onClose}
       title="Settings"
-      size={780}
+      size={900}
       centered
       withCloseButton
       classNames={{ body: 'settings-modal-body' }}
