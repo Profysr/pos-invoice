@@ -46,9 +46,9 @@ function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = fa
     <form onSubmit={form.onSubmit(onSave)}>
       <Stack gap="md">
         <Box>
-          <Text fw={600} size="sm" mb="xs">
+          {/* <Text fw={600} size="sm" mb="xs">
             Company
-          </Text>
+          </Text> */}
           <Stack gap="sm">
             <TextInput
               label="Company name"
@@ -129,9 +129,9 @@ function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = fa
         <Divider />
 
         <Box>
-          <Text fw={600} size="sm" mb="xs">
+          {/* <Text fw={600} size="sm" mb="xs">
             Address
-          </Text>
+          </Text> */}
           <Textarea
             label="Address"
             description="Receipt sender block — one line each: street, city/state/ZIP"

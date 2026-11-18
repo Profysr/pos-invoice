@@ -133,6 +133,8 @@ function PrinterSettingsSection({
           </Text>
           <SegmentedControl
             fullWidth
+            color="accent"
+            autoContrast
             data={[
               { value: '80', label: '80 mm (48 chars/line)' },
               { value: '58', label: '58 mm (32 chars/line)' }
@@ -144,7 +146,7 @@ function PrinterSettingsSection({
 
         <Divider />
 
-        <Group justify="space-between">
+        <Group justify='flex-end'>
           <Button
             type="button"
             variant="default"

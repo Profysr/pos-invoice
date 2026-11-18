@@ -2,7 +2,7 @@ import { formatReceiptDate, formatReceiptTime, groupTrackingNumber } from './dat
 import { formatMoney } from './invoice.js'
 
 const FOOTER_TRACKING =
-  'Text your tracking number to 28777 (2USPS) to get the latest status.Standard Message and Date Rates may apply.You may also visit www.usps.com USPS Tracking or call 1-800-222-1811.'
+  'Text your tracking number to 28777 (2USPS) to get the latest status.Standard Message and Date Rates may apply. You may also visit www.usps.com USPS Tracking or call 1-800-222-1811.'
 const FOOTER_INSURANCE =
   'Save this receipt as evidence of insurance. For information on filing an insurance claim go to https://www.usps.com/help/claims.html or call 1-800-222-1811.'
 
@@ -108,10 +108,7 @@ export function buildShippingReceiptLines({ receipt = {}, company = {}, printer 
   lines.push({ type: 'divider', character: '-' })
 
   lines.push({
-    text: formatTableRow(
-      [receipt.shippingService || 'Prepaid Mail', '1', '', money(price)],
-      width,
-    ),
+    text: formatTableRow([receipt.shippingService || 'Prepaid Mail', '1', '', money(price)], width),
     align: 'left'
   })
 
@@ -122,9 +119,19 @@ export function buildShippingReceiptLines({ receipt = {}, company = {}, printer 
   optionalLine(lines, receipt.packageWeight ? `  Weight: ${receipt.packageWeight}` : '')
 
   lines.push({ text: 'Expected Delivery Date:', align: 'left' })
-  optionalLine(lines, formatReceiptDate(receipt.expectedDeliveryDate) ? `  ${formatReceiptDate(receipt.expectedDeliveryDate)}` : '')
+  optionalLine(
+    lines,
+    formatReceiptDate(receipt.expectedDeliveryDate)
+      ? `  ${formatReceiptDate(receipt.expectedDeliveryDate)}`
+      : ''
+  )
   lines.push({ text: 'Tracking #:', align: 'left' })
-  optionalLine(lines, groupTrackingNumber(receipt.trackingNumber) ? `  ${groupTrackingNumber(receipt.trackingNumber)}` : '')
+  optionalLine(
+    lines,
+    groupTrackingNumber(receipt.trackingNumber)
+      ? `  ${groupTrackingNumber(receipt.trackingNumber)}`
+      : ''
+  )
 
   lines.push({ text: '', align: 'left' })
   if (receipt.insuranceLabel || insurance > 0) {
