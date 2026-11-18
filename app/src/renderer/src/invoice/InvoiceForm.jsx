@@ -12,6 +12,7 @@ import {
 import { Select } from '@mantine/core'
 import { IconPrinter } from '@tabler/icons-react'
 import { SHIPPING_SERVICES } from '../../../shared/shipping-services.js'
+import { sanitizeMoneyInput } from '../../../shared/invoice.js'
 
 function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false }) {
   return (
@@ -74,6 +75,9 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
                 style={{ flex: '1 1 110px' }}
                 key={form.key('price')}
                 {...form.getInputProps('price')}
+                onChange={(event) =>
+                  form.setFieldValue('price', sanitizeMoneyInput(event.currentTarget.value))
+                }
               />
               <Select
                 label="Service"
@@ -147,6 +151,12 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
                 style={{ flex: '1 1 140px' }}
                 key={form.key('insuranceAmount')}
                 {...form.getInputProps('insuranceAmount')}
+                onChange={(event) =>
+                  form.setFieldValue(
+                    'insuranceAmount',
+                    sanitizeMoneyInput(event.currentTarget.value)
+                  )
+                }
               />
             </Flex>
           </section>

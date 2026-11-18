@@ -72,7 +72,14 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
     validate: {
       date: (value) => (value.trim().length > 0 ? null : 'Date is required'),
       time: (value) => (value.trim().length > 0 ? null : 'Time is required'),
-      trackingNumber: (value) => (value.trim().length > 0 ? null : 'Tracking number is required'),
+      trackingNumber: (value) => {
+        const text = value.trim()
+        if (!text) return 'Tracking number is required'
+        if (!/^[A-Za-z0-9]+$/.test(text)) {
+          return 'Tracking number may only contain letters and digits'
+        }
+        return null
+      },
       price: (value) => {
         if (value.trim().length === 0) return 'Price is required'
         try {
@@ -80,6 +87,15 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
           return null
         } catch (error) {
           return error instanceof Error ? error.message : 'Price is invalid'
+        }
+      },
+      insuranceAmount: (value) => {
+        if (value.trim().length === 0) return null
+        try {
+          parseMoneyToMinorUnits(value, 'Insurance amount')
+          return null
+        } catch (error) {
+          return error instanceof Error ? error.message : 'Insurance amount is invalid'
         }
       }
       // shippingFrom is not a form field anymore — it comes from company

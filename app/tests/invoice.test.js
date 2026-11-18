@@ -4,8 +4,17 @@ import {
   formatMoney,
   normalizeShippingReceiptDraft,
   parseMoneyToMinorUnits,
+  sanitizeMoneyInput,
   storedShippingReceiptToDraft
 } from '../src/shared/invoice.js'
+
+test('sanitizes money input down to digits and one decimal point', () => {
+  assert.equal(sanitizeMoneyInput('$76'), '76')
+  assert.equal(sanitizeMoneyInput('1,234.56'), '1234.56')
+  assert.equal(sanitizeMoneyInput('7.6.2'), '7.62')
+  assert.equal(sanitizeMoneyInput('.5'), '.5')
+  assert.equal(sanitizeMoneyInput('abc'), '')
+})
 
 test('parses money into integer minor units', () => {
   assert.equal(parseMoneyToMinorUnits('1234'), 123400)

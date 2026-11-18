@@ -12,6 +12,14 @@ function optionalText(value, field) {
   return value.trim()
 }
 
+// Keep only what a money amount can hold: digits and a single decimal point.
+export function sanitizeMoneyInput(value) {
+  const cleaned = String(value ?? '').replace(/[^\d.]/g, '')
+  const dot = cleaned.indexOf('.')
+  if (dot === -1) return cleaned
+  return cleaned.slice(0, dot + 1) + cleaned.slice(dot + 1).replace(/\./g, '')
+}
+
 export function parseMoneyToMinorUnits(value, field = 'Amount') {
   const text = String(value ?? '')
     .trim()
@@ -64,7 +72,7 @@ export function normalizeShippingReceiptDraft(values, id) {
     expectedDeliveryDate: optionalText(values?.expectedDeliveryDate, 'Expected delivery'),
     trackingNumber: requiredText(values?.trackingNumber, 'Tracking number'),
     notes: '',
-    shippingFrom: requiredText(values?.shippingFrom, 'Shipping from'),
+    shippingFrom: optionalText(values?.shippingFrom, 'Shipping from'),
     insuranceLabel: optionalText(values?.insuranceLabel, 'Insurance label')
   }
 
