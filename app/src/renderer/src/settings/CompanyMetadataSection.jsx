@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Box, Button, Divider, Group, Image, Select, Stack, Text, TextInput } from '@mantine/core'
+import { Box, Button, Divider, Group, Image, Select, Stack, Text, Textarea, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 
 function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = false }) {
@@ -132,9 +132,13 @@ function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = fa
           <Text fw={600} size="sm" mb="xs">
             Address
           </Text>
-          <TextInput
+          <Textarea
             label="Address"
-            placeholder="Street, city"
+            description="Receipt sender block — one line each: street, city/state/ZIP"
+            placeholder={'DE 5800 Corporate Dr Houston\nTX 77036'}
+            autosize
+            minRows={2}
+            maxRows={6}
             key={form.key('address')}
             {...form.getInputProps('address')}
           />

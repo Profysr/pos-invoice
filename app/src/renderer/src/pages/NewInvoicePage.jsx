@@ -25,8 +25,14 @@ function localDateParts(date = new Date()) {
   }
 }
 
-// Hard-coded default sender block; editable per receipt if the user needs to change it.
-const DEFAULT_SHIPPING_FROM = 'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036'
+// Sender block on the receipt = company name, address lines and phone from Settings.
+function companyShippingBlock(company) {
+  const addressLines = String(company?.address || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  return [company?.name, ...addressLines, company?.phone].filter(Boolean).join('\n')
+}
 
 function createInitialValues(bootstrap) {
   const now = localDateParts()
@@ -36,7 +42,7 @@ function createInitialValues(bootstrap) {
     time: now.time,
     trackingNumber: '',
     price: '',
-    shippingFrom: DEFAULT_SHIPPING_FROM,
+    shippingFrom: companyShippingBlock(bootstrap?.company),
     expectedDeliveryDate: '',
     service: DEFAULT_SHIPPING_SERVICE,
     destination: '',
@@ -75,9 +81,9 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
         } catch (error) {
           return error instanceof Error ? error.message : 'Price is invalid'
         }
-      },
-      shippingFrom: (value) =>
-        value.trim().length > 0 ? null : 'Shipping from is required'
+      }
+      // shippingFrom is not a form field anymore — it comes from company
+      // settings; an empty block surfaces through normalizeShippingReceiptDraft.
     }
   })
   const [invoiceId, setInvoiceId] = useState(() => editInvoice?.id ?? createId())
