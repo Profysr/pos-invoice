@@ -1,5 +1,5 @@
-import { mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { mkdirSync, statSync } from 'node:fs'
+import { dirname, extname, isAbsolute, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 const migrations = [
@@ -124,6 +124,59 @@ function optionalText(value, field) {
   if (value == null) return ''
   if (typeof value !== 'string') throw new Error(`${field} must be text`)
   return value.trim()
+}
+
+// ISO 4217 codes known to the runtime (ICU); no extra dependency needed.
+const ISO_4217 =
+  typeof Intl.supportedValuesOf === 'function'
+    ? new Set(Intl.supportedValuesOf('currency'))
+    : new Set()
+const LOGO_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp'])
+
+function hasControlChars(text) {
+  for (const char of text) {
+    const code = char.codePointAt(0)
+    // Tab, newline and carriage return are allowed (multi-line addresses).
+    if ((code < 32 && code !== 9 && code !== 10 && code !== 13) || code === 127) return true
+  }
+  return false
+}
+
+// Optional field with a length cap and no control characters.
+function boundedText(value, field, maxLength) {
+  const text = optionalText(value, field)
+  if (text.length > maxLength) throw new Error(`${field} must be ${maxLength} characters or fewer`)
+  if (hasControlChars(text)) throw new Error(`${field} contains invalid characters`)
+  return text
+}
+
+function optionalEmail(value, field) {
+  const text = boundedText(value, field, 254)
+  if (text && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(text)) {
+    throw new Error(`${field} must be a valid email address`)
+  }
+  return text
+}
+
+// Absolute path to an existing image file; rejects null bytes and stale references.
+function optionalLogoPath(value, field) {
+  if (value == null || value === '') return null
+  const path = optionalText(value, field)
+  if (path.includes('\0') || path.length > 1024) {
+    throw new Error(`${field} is not a valid file path`)
+  }
+  if (!isAbsolute(path)) throw new Error(`${field} must be an absolute path`)
+  if (!LOGO_EXTENSIONS.has(extname(path).toLowerCase())) {
+    throw new Error(`${field} must be a PNG, JPG, WEBP or GIF image`)
+  }
+  let stats
+  try {
+    stats = statSync(path)
+  } catch {
+    throw new Error(`${field} no longer exists — choose the logo again`)
+  }
+  if (!stats.isFile()) throw new Error(`${field} must point to a file`)
+  return path
 }
 
 function nonNegativeInteger(value, field) {
@@ -308,16 +361,26 @@ export function createDatabaseStore(databasePath) {
     },
 
     saveCompany(input) {
-      const name = requiredText(input?.name, 'Company name')
-      const address = optionalText(input?.address, 'Company address')
-      const phone = optionalText(input?.phone, 'Company phone')
-      const email = optionalText(input?.email, 'Company email')
+      // Every field except the currency is optional; all values are validated
+      // before they reach the database.
+      const name = boundedText(input?.name, 'Company name', 120)
+      const address = boundedText(input?.address, 'Company address', 300)
+      const phone = boundedText(input?.phone, 'Company phone', 50)
+      const email = optionalEmail(input?.email, 'Company email')
       const defaultCurrency = requiredText(input?.defaultCurrency, 'Default currency').toUpperCase()
-      if (defaultCurrency.length !== 3) throw new Error('Default currency must have three letters')
-      const logoPath = input?.logoPath ? optionalText(input.logoPath, 'Logo path') : null
+      const unknownCurrency =
+        ISO_4217.size > 0
+          ? !ISO_4217.has(defaultCurrency)
+          : !/^[A-Z]{3}$/.test(defaultCurrency)
+      if (unknownCurrency) {
+        throw new Error(`${defaultCurrency} is not a valid ISO 4217 currency code`)
+      }
+      const logoPath = optionalLogoPath(input?.logoPath, 'Logo path')
       const timestamp = now()
       const existing = store.getCompany()
 
+      // created_at is set on first insert only; the UPDATE below never touches
+      // it, so the original creation time survives every update.
       database
         .prepare(
           `INSERT INTO company_metadata

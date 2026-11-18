@@ -6,7 +6,6 @@ import {
   ScrollArea,
   Stack,
   Text,
-  Textarea,
   TextInput,
   Title
 } from '@mantine/core'
@@ -92,7 +91,7 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
           <section>
             <Title order={4}>Addresses</Title>
             <Stack gap="xs" mt={6}>
-              <Textarea
+              {/* <Textarea
                 label="Shipping from"
                 description="One line each: name, street, city/state/ZIP, phone"
                 placeholder={'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036\n(800)275-8777'}
@@ -102,7 +101,7 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
                 required
                 key={form.key('shippingFrom')}
                 {...form.getInputProps('shippingFrom')}
-              />
+              /> */}
               <Flex gap="xs" wrap="wrap">
                 <TextInput
                   label="Destination"

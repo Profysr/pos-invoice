@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Box, Button, Divider, Group, Image, Stack, Text, TextInput } from '@mantine/core'
+import { Box, Button, Divider, Group, Image, Select, Stack, Text, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 
 function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = false }) {
@@ -16,6 +16,12 @@ function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = fa
   })
   const [logoDataUrl, setLogoDataUrl] = useState(initialData.logoDataUrl || null)
   const [choosingLogo, setChoosingLogo] = useState(false)
+
+  const currencyNames = new Intl.DisplayNames(['en'], { type: 'currency' })
+  const CURRENCY_OPTIONS = Intl.supportedValuesOf('currency').map((code) => ({
+    value: code,
+    label: `${code} — ${currencyNames.of(code)}`
+  }));
 
   const chooseLogo = async () => {
     if (!onChooseLogo) return
@@ -47,14 +53,21 @@ function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = fa
             <TextInput
               label="Company name"
               placeholder="Business name shown on receipts"
-              required
+              // required
               key={form.key('name')}
               {...form.getInputProps('name')}
             />
-            <TextInput
+            {/* <TextInput
               label="Default currency"
               placeholder="PKR"
               description="Three-letter currency code used for new invoices"
+              key={form.key('defaultCurrency')}
+              {...form.getInputProps('defaultCurrency')}
+            /> */}
+            <Select
+              label="Default currency"
+              searchable
+              data={CURRENCY_OPTIONS}
               key={form.key('defaultCurrency')}
               {...form.getInputProps('defaultCurrency')}
             />
