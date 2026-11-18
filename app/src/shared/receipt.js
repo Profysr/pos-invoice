@@ -88,6 +88,8 @@ export function buildShippingReceiptLines({ receipt = {}, company = {}, printer 
     optionalLine(lines, line.trim(), 'center')
   }
 
+  // Header section ends here — one blank line before the body.
+  lines.push({ text: '', align: 'left' })
   lines.push({ type: 'divider', character: '-' })
   lines.push({
     text: formatColumns(
@@ -108,10 +110,13 @@ export function buildShippingReceiptLines({ receipt = {}, company = {}, printer 
   lines.push({
     text: formatTableRow(
       [receipt.shippingService || 'Prepaid Mail', '1', '', money(price)],
-      width
+      width,
     ),
     align: 'left'
   })
+
+  // Space between the shipped item row and the delivery details.
+  lines.push({ text: '', align: 'left' })
 
   optionalLine(lines, receipt.destinationAddress ? `  ${receipt.destinationAddress}` : '')
   optionalLine(lines, receipt.packageWeight ? `  Weight: ${receipt.packageWeight}` : '')
@@ -128,6 +133,8 @@ export function buildShippingReceiptLines({ receipt = {}, company = {}, printer 
     })
   }
 
+  // Space between the shipped item row and the totals block.
+  lines.push({ text: '', align: 'left' })
   lines.push({ text: formatColumns('Total', money(total), width), align: 'left' })
   lines.push({ type: 'divider', character: '-' })
   lines.push({
@@ -136,6 +143,8 @@ export function buildShippingReceiptLines({ receipt = {}, company = {}, printer 
     bold: true
   })
   lines.push({ type: 'divider', character: '-' })
+  // Footer section starts after a blank line.
+  lines.push({ text: '', align: 'left' })
 
   for (const paragraph of [FOOTER_TRACKING, FOOTER_INSURANCE]) {
     for (const text of wrapText(paragraph, width)) {

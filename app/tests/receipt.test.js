@@ -37,6 +37,11 @@ test('builds the shipping receipt template', () => {
 
   assert.ok(lines.some((line) => line.type === 'logo'))
   assert.ok(lines.filter((line) => line.type === 'divider').length >= 5)
+  // Section spacing: blank lines around header, body and footer blocks.
+  assert.ok(
+    lines.filter((line) => line.text === '').length >= 4,
+    'expected blank lines between receipt sections'
+  )
   assert.match(text, /DE MOSS/)
   assert.match(text, /Mon 08\/10\/2026/)
   assert.match(text, /6:06 PM/)

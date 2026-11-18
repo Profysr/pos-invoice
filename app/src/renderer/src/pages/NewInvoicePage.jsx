@@ -25,6 +25,9 @@ function localDateParts(date = new Date()) {
   }
 }
 
+// Hard-coded default sender block; editable per receipt if the user needs to change it.
+const DEFAULT_SHIPPING_FROM = 'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036'
+
 function createInitialValues(bootstrap) {
   const now = localDateParts()
   return {
@@ -33,7 +36,7 @@ function createInitialValues(bootstrap) {
     time: now.time,
     trackingNumber: '',
     price: '',
-    shippingFrom: '',
+    shippingFrom: DEFAULT_SHIPPING_FROM,
     expectedDeliveryDate: '',
     service: DEFAULT_SHIPPING_SERVICE,
     destination: '',
@@ -58,7 +61,7 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
     : createInitialValues(bootstrap)
 
   const form = useForm({
-    mode: 'uncontrolled',
+    mode: 'controlled',
     initialValues,
     validate: {
       date: (value) => (value.trim().length > 0 ? null : 'Date is required'),
