@@ -312,7 +312,10 @@ test('generates unique invoice numbers and updates print status', (t) => {
   assert.equal(store.getInvoice('invoice-status').printStatus, 'printing')
   assert.equal(store.setInvoicePrintStatus('invoice-status', 'succeeded'), true)
   assert.equal(store.getInvoice('invoice-status').printStatus, 'succeeded')
-  assert.throws(() => store.setInvoicePrintStatus('invoice-status', 'printed'), /Invalid invoice print status/)
+  assert.throws(
+    () => store.setInvoicePrintStatus('invoice-status', 'printed'),
+    /Invalid invoice print status/
+  )
   assert.throws(
     () => store.setInvoicePrintStatus('invoice-status', 'not_printed'),
     /Invalid invoice print status transition/
@@ -325,6 +328,8 @@ test('generates unique invoice numbers and updates print status', (t) => {
     () => store.setInvoicePrintStatus('invoice-status', 'succeeded'),
     /Invalid invoice print status transition/
   )
+  assert.equal(store.setInvoicePrintStatus('invoice-status', 'printing'), true)
+  assert.equal(store.setInvoicePrintStatus('invoice-status', 'failed'), true)
 
   store.deleteInvoice('invoice-status')
   const afterDelete = store.nextInvoiceNumber()

@@ -42,7 +42,6 @@ function SettingsModal({ opened, onClose }) {
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // State is only updated inside promise callbacks, never synchronously in the effect.
   const load = useCallback(() => {
     setLoading(true)
     setError('')
@@ -67,7 +66,16 @@ function SettingsModal({ opened, onClose }) {
   }, [])
 
   useEffect(() => {
-    if (opened) void Promise.resolve().then(load)
+    let active = true
+    if (opened) {
+      // Defer the request so the effect does not synchronously update state.
+      void Promise.resolve().then(() => {
+        if (active) void load()
+      })
+    }
+    return () => {
+      active = false
+    }
   }, [opened, load])
 
   const handleCompanySave = async (values) => {

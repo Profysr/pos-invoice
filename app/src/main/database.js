@@ -690,14 +690,12 @@ export function createDatabaseStore(databasePath) {
     },
 
     failInterruptedPrints() {
-      return (
-        database
-          .prepare(
-            `UPDATE invoices SET print_status = 'failed', updated_at = ?
+      return database
+        .prepare(
+          `UPDATE invoices SET print_status = 'failed', updated_at = ?
              WHERE print_status = 'printing'`
-          )
-          .run(now()).changes
-      )
+        )
+        .run(now()).changes
     },
 
     addPrintHistory(input) {

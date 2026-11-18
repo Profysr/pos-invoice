@@ -236,7 +236,8 @@ function registerIpcHandlers() {
 
     const printer = database.getPrinter('default')
     if (!printer) {
-      const message = 'Receipt saved, but no printer is configured. Open Settings and choose a printer.'
+      const message =
+        'Receipt saved, but no printer is configured. Open Settings and choose a printer.'
       const fallbackPrinter = defaultPrinter()
       database.recordPrintResult({
         id: randomUUID(),
