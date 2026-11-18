@@ -8,8 +8,9 @@ contextBridge.exposeInMainWorld('invoiceApi', {
   chooseLogo: () => ipcRenderer.invoke('logo:choose'),
   getPrinter: () => ipcRenderer.invoke('printer:get'),
   savePrinter: (values) => ipcRenderer.invoke('printer:save', values),
+  testPrinter: (values) => ipcRenderer.invoke('printer:test', values),
   listSystemPrinters: () => ipcRenderer.invoke('printer:list-system'),
-  listInvoices: () => ipcRenderer.invoke('invoice:list'),
+  listInvoices: (options) => ipcRenderer.invoke('invoice:list', options),
   getInvoice: (id) => ipcRenderer.invoke('invoice:get', id),
   deleteInvoice: (id) => ipcRenderer.invoke('invoice:delete', id),
   printInvoice: (payload) => ipcRenderer.invoke('invoice:print', payload)

@@ -187,7 +187,44 @@ function registerIpcHandlers() {
 
   ipcMain.handle('printer:list-system', () => listSystemPrinters())
 
-  ipcMain.handle('invoice:list', () => database.listInvoices())
+  // Runs the same code path as a real print with a short test job, without
+  // saving anything. Returns { ok, message } instead of throwing so the
+  // notification shows the raw socket/Windows error without an IPC prefix.
+  ipcMain.handle('printer:test', async (_event, values) => {
+    const profile = { ...defaultPrinter(), ...values }
+    const lines = [
+      { text: 'PRINTER TEST', align: 'center', bold: true },
+      { type: 'divider', character: '-' },
+      {
+        text: `${profile.paperWidthMm} mm paper, ${profile.characterWidth} characters per line`,
+        align: 'center'
+      },
+      { text: 'If you can read this, printing works.', align: 'center' }
+    ]
+
+    try {
+      if (profile.connectionType === 'network') {
+        const bytes = escPosBytes(lines, profile.characterWidth, {
+          cut: profile.cutAfterPrint,
+          feed: profile.feedLinesAfterPrint,
+          encoding: profile.encoding
+        })
+        const result = await sendNetwork(profile, bytes)
+        return {
+          ok: true,
+          message: `Sent ${result.bytes} bytes to ${profile.networkHost}:${profile.networkPort}.`
+        }
+      }
+
+      if (!profile.systemPrinterName) throw new Error('Choose an installed printer first')
+      await printSystem(lines, profile, '', { silent: true })
+      return { ok: true, message: `Test job sent to "${profile.systemPrinterName}".` }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle('invoice:list', (_event, options) => database.listInvoices(options))
 
   ipcMain.handle('invoice:get', (_event, id) => database.getInvoice(id))
 

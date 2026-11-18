@@ -2,6 +2,8 @@ import { mkdirSync, statSync } from 'node:fs'
 import { dirname, extname, isAbsolute, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
+const DEFAULT_PAGE_SIZE = 15
+
 const migrations = [
   {
     version: 1,
@@ -369,9 +371,7 @@ export function createDatabaseStore(databasePath) {
       const email = optionalEmail(input?.email, 'Company email')
       const defaultCurrency = requiredText(input?.defaultCurrency, 'Default currency').toUpperCase()
       const unknownCurrency =
-        ISO_4217.size > 0
-          ? !ISO_4217.has(defaultCurrency)
-          : !/^[A-Z]{3}$/.test(defaultCurrency)
+        ISO_4217.size > 0 ? !ISO_4217.has(defaultCurrency) : !/^[A-Z]{3}$/.test(defaultCurrency)
       if (unknownCurrency) {
         throw new Error(`${defaultCurrency} is not a valid ISO 4217 currency code`)
       }
@@ -506,11 +506,21 @@ export function createDatabaseStore(databasePath) {
       return store.getPrinter(id)
     },
 
-    listInvoices() {
-      return database
-        .prepare('SELECT * FROM invoices ORDER BY created_at DESC')
-        .all()
-        .map((row) => mapInvoice(row))
+    listInvoices({ page = 1, pageSize = DEFAULT_PAGE_SIZE, search = '' } = {}) {
+      const limit = Math.min(Math.max(Number(pageSize) || DEFAULT_PAGE_SIZE, 1), 100)
+      const offset = (Math.max(Number(page) || 1, 1) - 1) * limit
+      const query = String(search ?? '').trim()
+      const filter = query
+        ? 'WHERE instr(lower(invoice_number), lower(?)) > 0 OR instr(lower(tracking_number), lower(?)) > 0 OR instr(lower(destination_address), lower(?)) > 0'
+        : ''
+      const params = query ? [query, query, query] : []
+      const total = database
+        .prepare(`SELECT COUNT(*) AS count FROM invoices ${filter}`)
+        .get(...params).count
+      const rows = database
+        .prepare(`SELECT * FROM invoices ${filter} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+        .all(...params, limit, offset)
+      return { rows: rows.map((row) => mapInvoice(row)), total }
     },
 
     getInvoice(id) {

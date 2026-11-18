@@ -152,12 +152,52 @@ test('saves, calculates, updates, lists, and deletes an invoice', (t) => {
   assert.equal(updated.items[0].lineTotal, 2500)
   assert.equal(updated.subtotal, 2500)
   assert.equal(updated.total, 3000)
-  assert.equal(store.listInvoices().length, 1)
+  assert.equal(store.listInvoices().rows.length, 1)
   assert.equal(store.getInvoice('invoice-1').items.length, 1)
 
   assert.equal(store.deleteInvoice('invoice-1'), true)
   assert.equal(store.getInvoice('invoice-1'), null)
-  assert.equal(store.listInvoices().length, 0)
+  assert.equal(store.listInvoices().rows.length, 0)
+})
+
+test('paginates and searches saved invoices', (t) => {
+  const { store } = createTestStore(t)
+  for (let index = 1; index <= 5; index += 1) {
+    store.saveInvoice(
+      {
+        id: `invoice-${index}`,
+        invoiceNumber: `INV-00${index}`,
+        invoiceDate: '2026-11-17',
+        invoiceTime: '10:30',
+        currency: 'USD',
+        trackingNumber: `92019903670075364099${index}`,
+        destinationAddress: index === 3 ? 'DANBURY CT 06810' : 'HOUSTON TX 77036'
+      },
+      [
+        {
+          id: `item-${index}`,
+          description: 'Delivery service',
+          quantityMilli: 1000,
+          unitPrice: 1000
+        }
+      ]
+    )
+  }
+
+  const firstPage = store.listInvoices({ page: 1, pageSize: 2 })
+  assert.equal(firstPage.total, 5)
+  assert.equal(firstPage.rows.length, 2)
+
+  const lastPage = store.listInvoices({ page: 3, pageSize: 2 })
+  assert.equal(lastPage.rows.length, 1)
+
+  const matching = store.listInvoices({ page: 1, pageSize: 15, search: 'danbury' })
+  assert.equal(matching.total, 1)
+  assert.equal(matching.rows[0].invoiceNumber, 'INV-003')
+
+  const byTracking = store.listInvoices({ search: '920199036700753640994' })
+  assert.equal(byTracking.total, 1)
+  assert.equal(byTracking.rows[0].invoiceNumber, 'INV-004')
 })
 
 test('enforces invoice-number uniqueness and records print history', (t) => {

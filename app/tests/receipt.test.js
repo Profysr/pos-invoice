@@ -36,7 +36,8 @@ test('builds the shipping receipt template', () => {
   const text = lines.map((line) => line.text ?? '').join('\n')
 
   assert.ok(lines.some((line) => line.type === 'logo'))
-  assert.ok(lines.filter((line) => line.type === 'divider').length >= 5)
+  // Header rule was replaced by a blank line; four section rules remain.
+  assert.ok(lines.filter((line) => line.type === 'divider').length >= 4)
   // Section spacing: blank lines around header, body and footer blocks.
   assert.ok(
     lines.filter((line) => line.text === '').length >= 4,

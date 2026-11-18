@@ -37,6 +37,7 @@ function SettingsModal({ opened, onClose }) {
   const [printer, setPrinter] = useState(defaultPrinter)
   const [systemPrinters, setSystemPrinters] = useState([])
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [error, setError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -110,6 +111,26 @@ function SettingsModal({ opened, onClose }) {
     }
   }
 
+  const handlePrinterTest = async (values) => {
+    setTesting(true)
+    try {
+      const result = await window.invoiceApi.testPrinter(values)
+      notifications.show({
+        color: result.ok ? 'green' : 'red',
+        title: result.ok ? 'Printer test succeeded' : 'Printer test failed',
+        message: result.message
+      })
+    } catch (testError) {
+      notifications.show({
+        color: 'red',
+        title: 'Printer test failed',
+        message: testError instanceof Error ? testError.message : String(testError)
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
+
   const handleChooseLogo = () => window.invoiceApi.chooseLogo()
 
   const sections = [
@@ -166,7 +187,9 @@ function SettingsModal({ opened, onClose }) {
               initialData={printer}
               systemPrinters={systemPrinters}
               onSave={handlePrinterSave}
+              onTest={handlePrinterTest}
               saving={saving}
+              testing={testing}
             />
           )}
         </div>

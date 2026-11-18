@@ -1,7 +1,9 @@
 import { BrowserWindow } from 'electron'
 import { receiptLinesToHtml } from './printing.js'
 
-export async function printSystem(lines, printer, logoDataUrl = '') {
+export async function printSystem(lines, printer, logoDataUrl = '', options = {}) {
+  // silent: true skips the Windows print dialog (used by the Test button).
+  const { silent = false } = options
   const owner =
     BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows().find((window) => window.isVisible())
   const window = new BrowserWindow({
@@ -15,7 +17,7 @@ export async function printSystem(lines, printer, logoDataUrl = '') {
     return await new Promise((resolve, reject) => {
       window.webContents.print(
         {
-          silent: false,
+          silent,
           deviceName: printer.systemPrinterName || undefined,
           printBackground: true,
           margins: { marginType: 'none' }

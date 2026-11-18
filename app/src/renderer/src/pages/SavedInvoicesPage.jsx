@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useDebouncedValue } from '@mantine/hooks'
 import {
   ActionIcon,
   Alert,
   Badge,
   Button,
+  CloseButton,
   Group,
   Modal,
   Pagination,
   Paper,
+  Select,
   Table,
   Text,
   TextInput,
@@ -32,6 +35,10 @@ import ReceiptPreview from '../invoice/ReceiptPreview.jsx'
 import './SavedInvoicesPage.css'
 
 const ROWS_PER_PAGE_DEFAULT = 15
+const PAGE_SIZE_OPTIONS = ['15', '30', '50', '100'].map((size) => ({
+  value: size,
+  label: `${size} / page`
+}))
 
 const printStatusBadge = {
   not_printed: { label: 'Not printed', color: 'gray' },
@@ -46,56 +53,57 @@ function message(error) {
 }
 
 function SavedInvoicesPage({ onEdit }) {
-  const [invoices, setInvoices] = useState([])
+  const [rows, setRows] = useState([])
+  const [total, setTotal] = useState(0)
+  const [settledKey, setSettledKey] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(ROWS_PER_PAGE_DEFAULT)
   const [working, setWorking] = useState(false)
+  const [printingId, setPrintingId] = useState(null)
   const [viewing, setViewing] = useState(null)
   const [deleting, setDeleting] = useState(null)
+  const [debouncedSearch, , { flush }] = useDebouncedValue(search, 250)
+
+  // Loading is derived from the request key so the effect never sets state synchronously.
+  const requestKey = `${page}|${pageSize}|${debouncedSearch}|${reloadKey}`
+  const loading = settledKey !== requestKey
 
   useEffect(() => {
     let active = true
     const request = window.invoiceApi
-      ? window.invoiceApi.listInvoices()
+      ? window.invoiceApi.listInvoices({ page, pageSize, search: debouncedSearch })
       : Promise.reject(new Error('The application API is unavailable.'))
 
     request
-      .then((rows) => {
-        if (active) {
-          setInvoices(rows)
-          setLoadError('')
+      .then((result) => {
+        if (!active) return
+        setRows(result.rows)
+        setTotal(result.total)
+        setLoadError('')
+        setSettledKey(requestKey)
+        const lastPage = Math.max(1, Math.ceil(result.total / pageSize))
+        if (page > lastPage) {
+          // The last page was deleted or filtered away; the next fetch owns the loading state.
+          setPage(lastPage)
         }
       })
       .catch((loadFailure) => {
-        if (active) setLoadError(message(loadFailure))
+        if (!active) return
+        setLoadError(message(loadFailure))
+        setSettledKey(requestKey)
       })
 
     return () => {
       active = false
     }
-  }, [reloadKey])
+  }, [page, pageSize, debouncedSearch, reloadKey, requestKey])
 
   const refresh = () => setReloadKey((value) => value + 1)
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    if (!query) return invoices
-    return invoices.filter(
-      (invoice) =>
-        invoice.invoiceNumber.toLowerCase().includes(query) ||
-        (invoice.trackingNumber || '').toLowerCase().includes(query) ||
-        (invoice.destinationAddress || '').toLowerCase().includes(query)
-    )
-  }, [invoices, search])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE_DEFAULT))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = filtered.slice(
-    (safePage - 1) * ROWS_PER_PAGE_DEFAULT,
-    safePage * ROWS_PER_PAGE_DEFAULT
-  )
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   const viewingReceipt = useMemo(() => {
     if (!viewing?.invoice) return []
@@ -133,18 +141,23 @@ function SavedInvoicesPage({ onEdit }) {
   })
 
   const handlePrint = guard(async (row) => {
-    const invoice = await window.invoiceApi.getInvoice(row.id)
-    const payload = normalizeShippingReceiptDraft(
-      storedShippingReceiptToDraft(invoice),
-      invoice.id
-    )
-    const result = await window.invoiceApi.printInvoice(payload)
-    refresh()
-    notifications.show({
-      color: result.print.status === 'succeeded' ? 'green' : 'red',
-      title: result.print.status === 'succeeded' ? 'Receipt printed' : 'Print failed',
-      message: `${result.print.printerName}: ${result.print.message}`
-    })
+    setPrintingId(row.id)
+    try {
+      const invoice = await window.invoiceApi.getInvoice(row.id)
+      const payload = normalizeShippingReceiptDraft(
+        storedShippingReceiptToDraft(invoice),
+        invoice.id
+      )
+      const result = await window.invoiceApi.printInvoice(payload)
+      refresh()
+      notifications.show({
+        color: result.print.status === 'succeeded' ? 'green' : 'red',
+        title: result.print.status === 'succeeded' ? 'Receipt printed' : 'Print failed',
+        message: `${result.print.printerName}: ${result.print.message}`
+      })
+    } finally {
+      setPrintingId(null)
+    }
   })
 
   const confirmDelete = guard(async () => {
@@ -175,25 +188,61 @@ function SavedInvoicesPage({ onEdit }) {
       <Group justify="space-between" gap="sm" mb="sm" wrap="nowrap">
         <TextInput
           placeholder="Search reference, tracking or destination"
+          aria-label="Search receipts"
           value={search}
           onChange={(event) => {
             setSearch(event.currentTarget.value)
             setPage(1)
           }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') flush()
+          }}
           leftSection={<IconSearch size={16} stroke={1.5} />}
+          rightSection={
+            search ? (
+              <CloseButton
+                size="xs"
+                variant="transparent"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearch('')
+                  setPage(1)
+                }}
+              />
+            ) : undefined
+          }
+          rightSectionPointerEvents="all"
+          loading={loading}
+          loadingPosition="left"
           size="xs"
           className="saved-invoices-search"
         />
-        <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-          {filtered.length} receipt{filtered.length === 1 ? '' : 's'}
-        </Text>
+        <Group gap="xs" wrap="nowrap">
+          <Select
+            size="xs"
+            aria-label="Receipts per page"
+            data={PAGE_SIZE_OPTIONS}
+            value={String(pageSize)}
+            onChange={(value) => {
+              setPageSize(Number(value) || ROWS_PER_PAGE_DEFAULT)
+              setPage(1)
+            }}
+            allowDeselect={false}
+            w={92}
+          />
+          <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+            {total} receipt{total === 1 ? '' : 's'}
+          </Text>
+        </Group>
       </Group>
 
-      {pageRows.length === 0 ? (
+      {rows.length === 0 ? (
         <Text size="sm" c="dimmed" py="lg" ta="center">
-          {invoices.length === 0
-            ? 'No receipts yet'
-            : `No receipts match "${search.trim()}"`}
+          {loading
+            ? 'Loading receipts…'
+            : search.trim()
+              ? `No receipts match "${search.trim()}"`
+              : 'No receipts yet'}
         </Text>
       ) : (
         <>
@@ -210,7 +259,7 @@ function SavedInvoicesPage({ onEdit }) {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {pageRows.map((invoice) => {
+              {rows.map((invoice) => {
                 const status = printStatusBadge[invoice.printStatus] ?? printStatusBadge.not_printed
                 return (
                   <Table.Tr key={invoice.id}>
@@ -235,6 +284,7 @@ function SavedInvoicesPage({ onEdit }) {
                             size="sm"
                             aria-label={`Print ${invoice.invoiceNumber}`}
                             disabled={working}
+                            loading={printingId === invoice.id}
                             onClick={() => handlePrint(invoice)}
                           >
                             <IconPrinter size={16} stroke={1.5} />
@@ -284,18 +334,22 @@ function SavedInvoicesPage({ onEdit }) {
             </Table.Tbody>
           </Table>
 
-          {totalPages > 1 && (
-            <Group justify="flex-end" mt="sm">
+          <Group justify="space-between" mt="sm" gap="sm">
+            <Text size="xs" c="dimmed">
+              Page {Math.min(page, totalPages)} of {totalPages}
+            </Text>
+            {totalPages > 1 && (
               <Pagination
                 total={totalPages}
-                value={safePage}
+                value={Math.min(page, totalPages)}
                 onChange={setPage}
                 size="sm"
-                siblings={0}
-                boundaries={false}
+                siblings={1}
+                boundaries={1}
+                withEdges
               />
-            </Group>
-          )}
+            )}
+          </Group>
         </>
       )}
 

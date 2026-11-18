@@ -1,11 +1,25 @@
-import { Box, Button, Divider, Group, NumberInput, Select, Stack, Switch, Text, TextInput } from '@mantine/core'
+import {
+  Box,
+  Button,
+  Divider,
+  Group,
+  NumberInput,
+  SegmentedControl,
+  Select,
+  Stack,
+  Text,
+  TextInput
+} from '@mantine/core'
 import { useForm } from '@mantine/form'
+import { paperPreset } from '../../../shared/paper.js'
 
 function PrinterSettingsSection({
   initialData,
   systemPrinters = [],
   onSave,
-  saving = false
+  onTest,
+  saving = false,
+  testing = false
 }) {
   const form = useForm({
     mode: 'uncontrolled',
@@ -15,13 +29,15 @@ function PrinterSettingsSection({
       networkHost: initialData.networkHost || '',
       networkPort: Number(initialData.networkPort) || 9100,
       systemPrinterName: initialData.systemPrinterName || '',
-      paperWidthMm: Number(initialData.paperWidthMm) || 80,
+      // The only format question the user answers; the grid is derived on save.
+      paperWidthMm: Number(initialData.paperWidthMm) === 58 ? '58' : '80',
+      // Kept in the profile but no longer asked for — values round-trip on save.
       printableWidthMm: Number(initialData.printableWidthMm) || 72,
       characterWidth: Number(initialData.characterWidth) || 48,
       dotDensity: Number(initialData.dotDensity) || 8,
       encoding: initialData.encoding || 'CP437',
       cutAfterPrint: initialData.cutAfterPrint ?? true,
-      feedLinesAfterPrint: Number(initialData.feedLinesAfterPrint) || 0,
+      feedLinesAfterPrint: initialData.feedLinesAfterPrint ?? 2,
       timeoutMs: Number(initialData.timeoutMs) || 5000
     }
   })
@@ -31,7 +47,7 @@ function PrinterSettingsSection({
     { value: '', label: 'Choose an installed printer' },
     ...systemPrinters.map((printer) => ({
       value: printer.name,
-      label: printer.displayName
+      label: printer.isDefault ? `${printer.displayName} (default)` : printer.displayName
     }))
   ]
   if (
@@ -44,8 +60,11 @@ function PrinterSettingsSection({
     })
   }
 
+  // Merge the derived paper grid into whatever the form holds.
+  const buildProfile = (values) => ({ ...values, ...paperPreset(values.paperWidthMm) })
+
   return (
-    <form onSubmit={form.onSubmit(onSave)}>
+    <form onSubmit={form.onSubmit((values) => onSave(buildProfile(values)))}>
       <Stack gap="md">
         <Box>
           <Text fw={600} size="sm" mb="xs">
@@ -80,6 +99,7 @@ function PrinterSettingsSection({
               <>
                 <TextInput
                   label="Printer host / IP"
+                  description="Tip: the printer's self-test page (hold Feed while powering on) prints its IP"
                   placeholder="192.168.1.50"
                   required
                   key={form.key('networkHost')}
@@ -102,15 +122,6 @@ function PrinterSettingsSection({
                 {...form.getInputProps('systemPrinterName')}
               />
             )}
-
-            <NumberInput
-              label="Connection timeout"
-              description="Milliseconds"
-              min={100}
-              step={100}
-              key={form.key('timeoutMs')}
-              {...form.getInputProps('timeoutMs')}
-            />
           </Stack>
         </Box>
 
@@ -118,78 +129,30 @@ function PrinterSettingsSection({
 
         <Box>
           <Text fw={600} size="sm" mb="xs">
-            Receipt format
+            Paper
           </Text>
-          <Stack gap="sm">
-            <Group grow align="flex-start">
-              <NumberInput
-                label="Paper width"
-                description="mm"
-                min={20}
-                max={200}
-                key={form.key('paperWidthMm')}
-                {...form.getInputProps('paperWidthMm')}
-              />
-              <NumberInput
-                label="Printable width"
-                description="mm"
-                min={10}
-                max={200}
-                key={form.key('printableWidthMm')}
-                {...form.getInputProps('printableWidthMm')}
-              />
-              <NumberInput
-                label="Character width"
-                description="characters per line"
-                min={16}
-                max={100}
-                key={form.key('characterWidth')}
-                {...form.getInputProps('characterWidth')}
-              />
-              <NumberInput
-                label="Dot density"
-                description="dots per mm (8 = 203 dpi)"
-                min={4}
-                max={16}
-                step={0.1}
-                key={form.key('dotDensity')}
-                {...form.getInputProps('dotDensity')}
-              />
-            </Group>
-            <Select
-              label="Encoding"
-              data={['CP437', 'CP850', 'CP865', 'ISO-8859-1']}
-              key={form.key('encoding')}
-              {...form.getInputProps('encoding')}
-            />
-          </Stack>
+          <SegmentedControl
+            fullWidth
+            data={[
+              { value: '80', label: '80 mm (48 chars/line)' },
+              { value: '58', label: '58 mm (32 chars/line)' }
+            ]}
+            key={form.key('paperWidthMm')}
+            {...form.getInputProps('paperWidthMm')}
+          />
         </Box>
 
         <Divider />
 
-        <Box>
-          <Text fw={600} size="sm" mb="xs">
-            Output
-          </Text>
-          <Stack gap="sm">
-            <Switch
-              label="Cut after print"
-              key={form.key('cutAfterPrint')}
-              {...form.getInputProps('cutAfterPrint', { type: 'checkbox' })}
-            />
-            <NumberInput
-              label="Feed lines after print"
-              min={0}
-              max={20}
-              key={form.key('feedLinesAfterPrint')}
-              {...form.getInputProps('feedLinesAfterPrint')}
-            />
-          </Stack>
-        </Box>
-
-        <Divider />
-
-        <Group justify="flex-end">
+        <Group justify="space-between">
+          <Button
+            type="button"
+            variant="default"
+            loading={testing}
+            onClick={() => void onTest(buildProfile(form.getValues()))}
+          >
+            Test print
+          </Button>
           <Button type="submit" loading={saving}>
             Save
           </Button>
