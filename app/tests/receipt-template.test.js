@@ -83,10 +83,11 @@ test('handles multiple items', () => {
   const ops = renderReceiptTemplate({
     ...receipt,
     shippingService: 'First Item',
-    subtotal: 1000,
+    subtotal: 2000,
+    // Exact shape returned by database.getInvoice()/mapInvoice().
     items: [
-      { product: 'First Item', qty: '1', unitPrice: '$10.00', price: '$10.00' },
-      { product: 'Second Item', qty: '2', unitPrice: '$5.00', price: '$10.00' }
+      { id: 'i1', position: 0, description: 'First Item', quantityMilli: 1000, unitPrice: 1000, lineTotal: 1000 },
+      { id: 'i2', position: 1, description: 'Second Item', quantityMilli: 2000, unitPrice: 500, lineTotal: 1000 }
     ]
   }, company, {
     characterWidth: 48,
@@ -96,6 +97,24 @@ test('handles multiple items', () => {
   const text = opsText(ops)
   assert.ok(text.some((t) => t.includes('First Item')), 'first item present')
   assert.ok(text.some((t) => t.includes('Second Item')), 'second item present')
+  assert.ok(text.some((t) => t.includes('$10.00')), 'minor units converted to money')
+  assert.ok(text.some((t) => t.includes('$20.00')), 'grand total summed from items')
+})
+
+test('maps a single stored line item onto the table columns', () => {
+  const ops = renderReceiptTemplate({
+    ...receipt,
+    subtotal: 6522,
+    items: [
+      { id: 'i1', position: 0, description: 'Prepaid Mail', quantityMilli: 1000, unitPrice: 6522, lineTotal: 6522 }
+    ]
+  }, company, printer)
+
+  const text = opsText(ops)
+  const row = text.find((t) => t.includes('Prepaid Mail'))
+  assert.ok(row, 'product description rendered')
+  assert.ok(row.includes('$65.22'), `unit price rendered as money: ${JSON.stringify(row)}`)
+  assert.ok(!/\b6522\b/.test(row), 'raw minor units never reach the printer')
 })
 
 test('formats large amounts', () => {

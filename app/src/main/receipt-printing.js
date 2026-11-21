@@ -50,7 +50,7 @@ export function createNetTransport(profile) {
  * @param {object} company
  * @param {object} printer - { characterWidth, paperWidthMm, dotDensity, printableWidthMm }
  * @param {object} options
- * @param {object|null} options.logo - pre-rasterized bitmap { width, height, data }
+ * @param {object|null} options.logo - pre-rasterized bitmap { widthDots, heightDots, data }
  * @param {string} options.logoPath - logo file path to rasterize (Electron only)
  * @param {function} options.rasterizeLogo - fn(logoPath, {widthDots}) => bitmap|null
  * @returns {Promise<Buffer>} ESC/POS bytes ready to send over LAN
@@ -68,11 +68,12 @@ export async function encodeReceipt(receipt, company, printer, options = {}) {
 
   // The template `image` block does not interpolate width/height/data, so a
   // runtime logo is prepended as a raw ESC/POS GS v 0 raster op instead.
+  // rasterizeLogo() reports its size as widthDots/heightDots.
   if (logoBitmap) {
     ops.unshift({
       kind: 'raster',
-      width: logoBitmap.width,
-      height: logoBitmap.height,
+      width: logoBitmap.widthDots,
+      height: logoBitmap.heightDots,
       bits: new Uint8Array(logoBitmap.data)
     })
   }
@@ -82,6 +83,45 @@ export async function encodeReceipt(receipt, company, printer, options = {}) {
   ops.unshift({ kind: 'init' })
 
   return encodeEscPos(ops, profile)
+}
+
+/**
+ * Send a pre-encoded ESC/POS buffer to a LAN printer.
+ *
+ * Lifecycle is open -> write -> close; `close()` runs in a `finally` so the
+ * socket is released on success and on every failure (refused, timeout,
+ * mid-stream disconnect). The transport itself never rejects from `close()`,
+ * so it cannot mask the original error.
+ *
+ * Returns the same `{ ok, bytes, message }` shape the existing `sendNetwork`
+ * produced, keeping the invoice:print response text unchanged.
+ */
+export async function sendBytesLan(bytes, printer) {
+  // Legacy sendNetwork() rejected a missing host; NetTransport would otherwise
+  // silently fall back to localhost.
+  if (!printer?.networkHost) throw new Error('Network printer host is missing')
+
+  const transport = createNetTransport(printer)
+  try {
+    await transport.open()
+    await transport.write(bytes)
+  } finally {
+    await transport.close()
+  }
+  return {
+    ok: true,
+    bytes: bytes.length,
+    message: 'Data sent to printer. Physical output is not guaranteed.'
+  }
+}
+
+/**
+ * Encode a receipt and send it to a LAN printer in one call.
+ * This is the entry point used by the invoice:print network branch.
+ */
+export async function sendReceiptLan(receipt, company, printer, options = {}) {
+  const bytes = await encodeReceipt(receipt, company, printer, options)
+  return sendBytesLan(bytes, printer)
 }
 
 export { buildReceiptViewModel }

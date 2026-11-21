@@ -1,5 +1,6 @@
 import { render } from 'retail-print-kit'
 import { formatMoney } from './invoice.js'
+import { formatReceiptDate, formatReceiptTime, groupTrackingNumber } from './dates.js'
 import { wrapText } from './receipt.js'
 
 /**
@@ -18,8 +19,9 @@ import { wrapText } from './receipt.js'
  * - footer paragraphs (centered, wrapped)
  * - optional company logo image block
  *
- * Monetary values are pre-formatted with the existing formatMoney so no
- * formatting behavior is lost; this module only handles layout.
+ * Monetary values, dates, times and tracking numbers are pre-formatted with
+ * the existing helpers so no formatting behavior is lost; this module only
+ * handles layout.
  */
 export const RECEIPT_TEMPLATE = {
   name: 'shipping-receipt',
@@ -111,11 +113,10 @@ export const RECEIPT_TEMPLATE = {
 /**
  * Build the view-model + profile for rendering the receipt template.
  *
- * @param {object} receipt
+ * @param {object} receipt - stored invoice, including DB-shaped `items`
  * @param {object} company
  * @param {object} printer - { characterWidth, paperWidthMm }
- * @param {object|null} logo - { width, height, data } base64 bitmap or null
- * @returns {[{}, object, object]} [data, profile] for retail-print-kit render()
+ * @returns {[{}, object]} [data, profile] for retail-print-kit render()
  */
 export function buildReceiptViewModel(receipt, company, printer) {
   const width = Math.max(24, Number(printer.characterWidth) || 48)
@@ -135,8 +136,16 @@ export function buildReceiptViewModel(receipt, company, printer) {
 
   // Multi-item support: use receipt.items when provided, otherwise a single
   // shipping-service row matching the existing receipt model.
+  // Production receipts carry DB-shaped line items (description / quantityMilli
+  // / unitPrice / lineTotal, money in minor units); map them onto the columns
+  // the template renders.
   const items = Array.isArray(receipt.items) && receipt.items.length > 0
-    ? receipt.items
+    ? receipt.items.map((item) => ({
+        product: item.description || '',
+        qty: String(Number((Number(item.quantityMilli) / 1000).toFixed(3))),
+        unitPrice: money(item.unitPrice),
+        price: money(item.lineTotal)
+      }))
     : [{ product, qty: '1', unitPrice: priceFormatted, price: priceFormatted }]
 
   const footerLines = []
@@ -151,13 +160,13 @@ export function buildReceiptViewModel(receipt, company, printer) {
 
   const data = {
     shippingFromLines,
-    invoiceDate: receipt.invoiceDate || '',
-    invoiceTime: receipt.invoiceTime || '',
+    invoiceDate: formatReceiptDate(receipt.invoiceDate),
+    invoiceTime: formatReceiptTime(receipt.invoiceTime),
     items,
     destinationAddress: receipt.destinationAddress || '',
     packageWeight: receipt.packageWeight || '',
-    expectedDeliveryDate: receipt.expectedDeliveryDate || '',
-    trackingNumber: receipt.trackingNumber || '',
+    expectedDeliveryDate: formatReceiptDate(receipt.expectedDeliveryDate),
+    trackingNumber: groupTrackingNumber(receipt.trackingNumber),
     insuranceLabel: receipt.insuranceLabel || '',
     insurance: insuranceFormatted,
     totalLabel: 'Total',

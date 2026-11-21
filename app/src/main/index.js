@@ -5,8 +5,8 @@ import { extname, join } from 'node:path'
 import icon from '../../resources/icon.png?asset'
 import { createDatabaseStore, initializeUserData } from './database.js'
 import { buildShippingReceiptLines } from '../shared/receipt.js'
-import { escPosBytes, sendNetwork } from './printing.js'
-import { rasterizeLogo } from './logo-raster.js'
+import { escPosBytes } from './printing.js'
+import { sendBytesLan, sendReceiptLan } from './receipt-printing.js'
 import { printSystem } from './system-print.js'
 
 let database
@@ -15,9 +15,6 @@ let mainWindow
 
 function defaultCompany() {
   return {
-    name: '',
-    phone: '',
-    email: '',
     defaultCurrency: 'USD',
     logoPath: null
   }
@@ -208,7 +205,7 @@ function registerIpcHandlers() {
           feed: profile.feedLinesAfterPrint,
           encoding: profile.encoding
         })
-        const result = await sendNetwork(profile, bytes)
+        const result = await sendBytesLan(bytes, profile)
         return {
           ok: true,
           message: `Sent ${result.bytes} bytes to ${profile.networkHost}:${profile.networkPort}.`
@@ -267,17 +264,10 @@ function registerIpcHandlers() {
 
       let result
       if (printer.connectionType === 'network') {
-        const dotDensity = Number(printer.dotDensity) || 8
-        const printableDots = Math.round((Number(printer.printableWidthMm) || 72) * dotDensity)
-        const logo = rasterizeLogo(logoPath, { widthDots: Math.round(printableDots * 0.7) })
-        const bytes = escPosBytes(lines, printer.characterWidth, {
-          cut: printer.cutAfterPrint,
-          feed: printer.feedLinesAfterPrint,
-          encoding: printer.encoding,
-          logo,
-          printableDots
-        })
-        result = await sendNetwork(printer, bytes)
+        // retail-print-kit path: encode the receipt, then open -> write -> close
+        // on the configured host/port/timeout. Windows system printing below is
+        // untouched.
+        result = await sendReceiptLan(saved, company, printer, { logoPath })
       } else {
         const logoDataUrl = (await withLogoDataUrl(company)).logoDataUrl
         result = await printSystem(lines, printer, logoDataUrl)

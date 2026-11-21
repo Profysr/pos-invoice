@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict'
+import net from 'node:net'
 import test from 'node:test'
 import {
   encodeEscPos,
   NetTransport,
   profiles
 } from 'retail-print-kit'
-import { encodeReceipt, createNetTransport, rasterizeReceiptLogo, logoWidthDots } from '../src/main/receipt-printing.js'
+import {
+  encodeReceipt,
+  createNetTransport,
+  rasterizeReceiptLogo,
+  logoWidthDots,
+  sendBytesLan,
+  sendReceiptLan
+} from '../src/main/receipt-printing.js'
 import { escPosBytes } from '../src/main/printing.js'
 
 const receipt = {
@@ -128,16 +136,65 @@ test('cut and feed ops are encoded', () => {
 })
 
 test('encodeReceipt embeds a rasterized logo image when one is provided', async () => {
+  // Exact shape returned by src/main/logo-raster.js rasterizeLogo().
   const logo = {
-    width: 16,
-    height: 2,
-    data: Buffer.from([0b10100000, 0b01000000]) // MSB-first packed, matches logo-raster output
+    data: Buffer.from([0b10100000, 0b01000000]), // MSB-first packed
+    bytesPerRow: 2,
+    widthDots: 16,
+    heightDots: 1
   }
   const bytes = await encodeReceipt(receipt, company, printer, { logo })
   const latin = bytes.toString('latin1')
   assert.ok(latin.includes('Prepaid Mail'), 'receipt text still present')
-  assert.ok(bytes.includes(0x1d), 'GS raster command present for logo')
-  assert.ok(bytes.includes(0x76), 'GS v image command present')
+
+  const command = bytes.indexOf(Buffer.from([0x1d, 0x76, 0x30, 0x00]))
+  assert.ok(command > -1, 'GS v 0 raster command present')
+  // GS v 0 carries bytes-per-row (ceil(width/8)) in the xL/xH slot, not pixels.
+  assert.equal(bytes[command + 4], 2, '16 dots -> 2 bytes per row')
+  assert.equal(bytes[command + 5], 0, 'raster width high byte')
+  assert.equal(bytes[command + 6], 1, 'raster height comes from heightDots')
+  assert.equal(bytes[command + 7], 0, 'raster height high byte')
+  assert.deepEqual(
+    bytes.subarray(command + 8, command + 10),
+    logo.data,
+    'bitmap payload follows the header'
+  )
+})
+
+test('encodeReceipt rasterizes through logoPath using the rasterizer contract', async () => {
+  // Production passes logoPath, not a pre-built bitmap, so this is the path
+  // invoice:print actually takes.
+  const seen = {}
+  const rasterizeLogo = async (logoPath, options) => {
+    seen.logoPath = logoPath
+    seen.options = options
+    return { data: Buffer.from([0xff]), bytesPerRow: 1, widthDots: 8, heightDots: 1 }
+  }
+
+  const bytes = await encodeReceipt(receipt, company, printer, {
+    logoPath: '/tmp/company-logo.png',
+    rasterizeLogo
+  })
+
+  assert.equal(seen.logoPath, '/tmp/company-logo.png')
+  assert.equal(seen.options.widthDots, logoWidthDots(printer), 'logo sized from printer dots')
+
+  const command = bytes.indexOf(Buffer.from([0x1d, 0x76, 0x30, 0x00]))
+  assert.ok(command > -1, 'GS v 0 raster command present')
+  assert.equal(bytes[command + 4], 1, 'widthDots 8 -> one byte per row')
+  assert.equal(bytes[command + 6], 1, 'height taken from heightDots')
+})
+
+test('encodeReceipt skips the logo when the rasterizer finds no image', async () => {
+  const bytes = await encodeReceipt(receipt, company, printer, {
+    logoPath: '/tmp/missing.png',
+    rasterizeLogo: async () => null
+  })
+  assert.equal(
+    bytes.indexOf(Buffer.from([0x1d, 0x76, 0x30, 0x00])),
+    -1,
+    'no raster command without a bitmap'
+  )
 })
 
 test('rasterizeReceiptLogo returns null when there is no logo path', async () => {
@@ -176,4 +233,116 @@ test('new ESC/POS output matches the existing encoder on structural features', a
   // Both encoders emit a terminating cut block.
   assert.ok(oldBytes.includes(0x1d) && oldBytes.includes(0x56))
   assert.ok(newBytes.includes(0x1d) && newBytes.includes(0x56))
+})
+
+// --- Phase 4: LAN transport ---------------------------------------------
+
+function lanPrinter(overrides = {}) {
+  return { networkHost: '127.0.0.1', networkPort: 9100, timeoutMs: 2000, ...overrides }
+}
+
+test('sendReceiptLan prints to a controlled TCP server exactly once', async (t) => {
+  let received = Buffer.alloc(0)
+  let connections = 0
+  let resolveClosed
+  const closed = new Promise((resolve) => {
+    resolveClosed = resolve
+  })
+
+  const server = net.createServer((socket) => {
+    connections += 1
+    socket.on('data', (data) => {
+      received = Buffer.concat([received, data])
+    })
+    socket.on('close', () => resolveClosed())
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const { port } = server.address()
+
+  const result = await sendReceiptLan(receipt, company, lanPrinter({ networkPort: port }))
+
+  // The transport ends the socket, so a server-side close proves the whole
+  // payload arrived and the connection was released.
+  await Promise.race([
+    closed,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('client socket was never closed')), 3000)
+    )
+  ])
+
+  assert.equal(result.ok, true)
+  assert.equal(connections, 1, 'exactly one connection — no duplicate print attempts')
+  assert.equal(result.bytes, received.length, 'full payload delivered')
+  assert.equal(received[0], 0x1b)
+  assert.equal(received[1], 0x40, 'ESC @ initialization')
+  assert.ok(received.toString('latin1').includes('Prepaid Mail'), 'receipt body delivered')
+  assert.equal(
+    result.message,
+    'Data sent to printer. Physical output is not guaranteed.',
+    'invoice:print response text unchanged'
+  )
+})
+
+test('sendBytesLan fails cleanly when the connection is refused', async () => {
+  const probe = net.createServer()
+  await new Promise((resolve) => probe.listen(0, '127.0.0.1', resolve))
+  const { port } = probe.address()
+  await new Promise((resolve) => probe.close(resolve))
+
+  const start = Date.now()
+  await assert.rejects(
+    () => sendBytesLan(Buffer.from('payload'), lanPrinter({ networkPort: port })),
+    /ECONNREFUSED/,
+    'a refused connection rejects rather than reporting success'
+  )
+  assert.ok(Date.now() - start < 3000, 'rejected promptly instead of hanging')
+})
+
+test('sendBytesLan times out when the printer never accepts the connection', async () => {
+  const start = Date.now()
+  await assert.rejects(
+    () =>
+      sendBytesLan(
+        Buffer.from('payload'),
+        {
+          // RFC 5737 documentation range: guaranteed unroutable, so the
+          // connect attempt always reaches the configured timeout.
+          networkHost: '192.0.2.1',
+          networkPort: 9100,
+          timeoutMs: 500
+        }
+      ),
+    /timeout connecting/,
+    'timeout surfaces as an error, never as success'
+  )
+  const elapsed = Date.now() - start
+  assert.ok(elapsed >= 400, `waited for the connect timeout, got ${elapsed}ms`)
+  assert.ok(elapsed < 3000, `did not hang past the timeout, got ${elapsed}ms`)
+})
+
+test('sendBytesLan rejects a missing host instead of defaulting to localhost', async () => {
+  await assert.rejects(
+    () => sendBytesLan(Buffer.from('payload'), { networkHost: '', networkPort: 9100, timeoutMs: 1000 }),
+    /Network printer host is missing/,
+    'legacy guard preserved'
+  )
+})
+
+test('sendBytesLan settles without hanging when the printer disconnects mid-stream', async (t) => {
+  const server = net.createServer((socket) => {
+    socket.once('data', () => socket.destroy())
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  const { port } = server.address()
+
+  const outcome = await Promise.race([
+    sendBytesLan(Buffer.alloc(4 * 1024 * 1024, 0x41), lanPrinter({ networkPort: port, timeoutMs: 1000 })).then(
+      () => 'settled',
+      () => 'settled'
+    ),
+    new Promise((resolve) => setTimeout(() => resolve('hung'), 5000))
+  ])
+  assert.equal(outcome, 'settled', 'open/write/close always settles — socket never leaks')
 })
