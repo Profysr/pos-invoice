@@ -122,6 +122,25 @@ const migrations = [
       DELETE FROM print_history;
       DELETE FROM invoices;
     `
+  },
+  {
+    version: 3,
+    sql: `
+      CREATE TABLE company_metadata_v3 (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        default_currency TEXT NOT NULL DEFAULT 'USD',
+        logo_path TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      INSERT INTO company_metadata_v3 (id, default_currency, logo_path, created_at, updated_at)
+      SELECT id, default_currency, logo_path, created_at, updated_at
+      FROM company_metadata;
+
+      DROP TABLE company_metadata;
+      ALTER TABLE company_metadata_v3 RENAME TO company_metadata;
+    `
   }
 ]
 
@@ -180,31 +199,6 @@ const ISO_4217 =
     ? new Set(Intl.supportedValuesOf('currency'))
     : new Set()
 const LOGO_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp'])
-
-function hasControlChars(text) {
-  for (const char of text) {
-    const code = char.codePointAt(0)
-    // Tab, newline and carriage return are allowed (multi-line addresses).
-    if ((code < 32 && code !== 9 && code !== 10 && code !== 13) || code === 127) return true
-  }
-  return false
-}
-
-// Optional field with a length cap and no control characters.
-function boundedText(value, field, maxLength) {
-  const text = optionalText(value, field)
-  if (text.length > maxLength) throw new Error(`${field} must be ${maxLength} characters or fewer`)
-  if (hasControlChars(text)) throw new Error(`${field} contains invalid characters`)
-  return text
-}
-
-function optionalEmail(value, field) {
-  const text = boundedText(value, field, 254)
-  if (text && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(text)) {
-    throw new Error(`${field} must be a valid email address`)
-  }
-  return text
-}
 
 // Absolute path to an existing image file; rejects null bytes and stale references.
 function optionalLogoPath(value, field) {
@@ -301,9 +295,6 @@ export function openDatabase(databasePath) {
 function mapCompany(row) {
   if (!row) return null
   return {
-    name: row.name,
-    phone: row.phone,
-    email: row.email,
     defaultCurrency: row.default_currency,
     logoPath: row.logo_path,
     createdAt: row.created_at,
@@ -433,11 +424,6 @@ export function createDatabaseStore(databasePath) {
     },
 
     saveCompany(input) {
-      // Every field except the currency is optional; all values are validated
-      // before they reach the database.
-      const name = boundedText(input?.name, 'Company name', 120)
-      const phone = boundedText(input?.phone, 'Company phone', 50)
-      const email = optionalEmail(input?.email, 'Company email')
       const defaultCurrency = requiredText(input?.defaultCurrency, 'Default currency').toUpperCase()
       const unknownCurrency =
         ISO_4217.size > 0 ? !ISO_4217.has(defaultCurrency) : !/^[A-Z]{3}$/.test(defaultCurrency)
@@ -453,25 +439,14 @@ export function createDatabaseStore(databasePath) {
       database
         .prepare(
           `INSERT INTO company_metadata
-             (id, name, phone, email, default_currency, logo_path, created_at, updated_at)
-           VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+             (id, default_currency, logo_path, created_at, updated_at)
+           VALUES (1, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
-             name = excluded.name,
-             phone = excluded.phone,
-             email = excluded.email,
              default_currency = excluded.default_currency,
              logo_path = excluded.logo_path,
              updated_at = excluded.updated_at`
         )
-        .run(
-          name,
-          phone,
-          email,
-          defaultCurrency,
-          logoPath,
-          existing?.createdAt ?? timestamp,
-          timestamp
-        )
+        .run(defaultCurrency, logoPath, existing?.createdAt ?? timestamp, timestamp)
 
       return store.getCompany()
     },

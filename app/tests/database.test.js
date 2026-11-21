@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import test from 'node:test'
 import { createDatabaseStore, initializeUserData } from '../src/main/database.js'
 
@@ -25,24 +26,29 @@ test('initializes user-data paths and applies database migrations', (t) => {
   assert.equal(existsSync(paths.database), true)
   assert.equal(existsSync(paths.uploads), true)
   assert.equal(existsSync(paths.backups), true)
-  assert.equal(store.getVersion(), 2)
+  assert.equal(store.getVersion(), 3)
 })
 
 test('stores settings, company metadata, and printer profiles', (t) => {
-  const { store } = createTestStore(t)
+  const { paths, store } = createTestStore(t)
 
   store.setSetting('defaultPaperWidth', '80')
   assert.equal(store.getSetting('defaultPaperWidth'), '80')
 
-  const company = store.saveCompany({
-    name: 'Example Company',
-    phone: '555-0100',
-    email: 'hello@example.com',
-    defaultCurrency: 'usd'
-  })
+  const company = store.saveCompany({ defaultCurrency: 'usd' })
   assert.equal(company.defaultCurrency, 'USD')
+  assert.equal('name' in company, false)
+  assert.equal('phone' in company, false)
+  assert.equal('email' in company, false)
   assert.equal('address' in company, false)
-  assert.equal(store.getCompany().name, 'Example Company')
+
+  const connection = new DatabaseSync(paths.database)
+  const columns = connection
+    .prepare('PRAGMA table_info(company_metadata)')
+    .all()
+    .map((column) => column.name)
+  connection.close()
+  assert.deepEqual(columns, ['id', 'default_currency', 'logo_path', 'created_at', 'updated_at'])
 
   const printer = store.savePrinter({
     id: 'printer-1',
@@ -62,32 +68,16 @@ test('stores settings, company metadata, and printer profiles', (t) => {
   assert.equal(store.listPrinters().length, 1)
 })
 
-test('validates and hardens company settings before saving', (t) => {
+test('validates company currency and logo path before saving', (t) => {
   const { root, store } = createTestStore(t)
 
-  // Everything except the currency is optional.
   const empty = store.saveCompany({ defaultCurrency: 'USD' })
-  assert.equal(empty.name, '')
   assert.equal(empty.logoPath, null)
 
   // Currency stays required and must be a real ISO 4217 code.
   assert.throws(() => store.saveCompany({}), /Default currency is required/)
   assert.throws(() => store.saveCompany({ defaultCurrency: 'US' }), /ISO 4217/)
   assert.throws(() => store.saveCompany({ defaultCurrency: 'ZZZ' }), /ISO 4217/)
-
-  // Field limits, formats, and character safety.
-  assert.throws(
-    () => store.saveCompany({ defaultCurrency: 'USD', name: 'x'.repeat(121) }),
-    /120 characters/
-  )
-  assert.throws(
-    () => store.saveCompany({ defaultCurrency: 'USD', email: 'not-an-email' }),
-    /valid email/
-  )
-  assert.throws(
-    () => store.saveCompany({ defaultCurrency: 'USD', name: 'bad\u0000name' }),
-    /invalid characters/
-  )
 
   // Logo path safety: shape first, then existence.
   assert.throws(
@@ -108,9 +98,9 @@ test('validates and hardens company settings before saving', (t) => {
   assert.equal(withLogo.logoPath, logoFile)
 
   // created_at survives updates.
-  const first = store.saveCompany({ defaultCurrency: 'USD', name: 'First' })
-  const second = store.saveCompany({ defaultCurrency: 'USD', name: 'Second' })
-  assert.equal(second.name, 'Second')
+  const first = store.saveCompany({ defaultCurrency: 'USD' })
+  const second = store.saveCompany({ defaultCurrency: 'EUR' })
+  assert.equal(second.defaultCurrency, 'EUR')
   assert.equal(second.createdAt, first.createdAt)
 })
 

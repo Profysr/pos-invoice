@@ -261,12 +261,18 @@ function SavedInvoicesPage({ onEdit }) {
             <Table.Tbody>
               {rows.map((invoice) => {
                 const status = printStatusBadge[invoice.printStatus] ?? printStatusBadge.not_printed
+                const destination = [
+                  invoice.destinationCity,
+                  [invoice.destinationState, invoice.destinationZip].filter(Boolean).join(' ')
+                ]
+                  .filter(Boolean)
+                  .join(', ')
                 return (
                   <Table.Tr key={invoice.id}>
                     <Table.Td className="saved-invoices-number">{invoice.invoiceNumber}</Table.Td>
                     <Table.Td>{invoice.invoiceDate}</Table.Td>
                     <Table.Td>{invoice.trackingNumber}</Table.Td>
-                    <Table.Td>{invoice.destinationAddress}</Table.Td>
+                    <Table.Td>{destination}</Table.Td>
                     <Table.Td style={{ textAlign: 'right' }}>
                       {formatMoney(invoice.total, invoice.currency)}
                     </Table.Td>

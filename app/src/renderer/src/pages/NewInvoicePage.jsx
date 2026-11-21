@@ -6,6 +6,7 @@ import { IconAlertCircle } from '@tabler/icons-react'
 import InvoiceForm from '../invoice/InvoiceForm.jsx'
 import ReceiptPreview from '../invoice/ReceiptPreview.jsx'
 import {
+  buildShippingReceiptFields,
   normalizeShippingReceiptDraft,
   parseMoneyToMinorUnits,
   storedShippingReceiptToDraft
@@ -25,15 +26,6 @@ function localDateParts(date = new Date()) {
   }
 }
 
-// Sender block on the receipt = company name, address lines and phone from Settings.
-function companyShippingBlock(company) {
-  const addressLines = String(company?.address || '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-  return [company?.name, ...addressLines, company?.phone].filter(Boolean).join('\n')
-}
-
 function createInitialValues(bootstrap) {
   const now = localDateParts()
   return {
@@ -42,13 +34,22 @@ function createInitialValues(bootstrap) {
     time: now.time,
     trackingNumber: '',
     price: '',
-    shippingFrom: companyShippingBlock(bootstrap?.company),
+    senderName: '',
+    senderStreet: '',
+    senderCity: '',
+    senderState: '',
+    senderZip: '',
+    senderContact: '',
+    senderContactArea: '',
+    senderContactPrefix: '',
+    senderContactLine: '',
     expectedDeliveryDate: '',
     service: DEFAULT_SHIPPING_SERVICE,
-    destination: '',
-    weight: '',
-    insuranceLabel: '',
-    insuranceAmount: '',
+    destCity: '',
+    destState: '',
+    destZip: '',
+    weightLb: '',
+    weightOz: '',
     currency: bootstrap?.company?.defaultCurrency || 'USD'
   }
 }
@@ -61,6 +62,10 @@ function safeMoney(value) {
   }
 }
 
+function requiredValue(label) {
+  return (value) => (String(value ?? '').trim() ? null : `${label} is required`)
+}
+
 function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
   const initialValues = editInvoice
     ? { ...createInitialValues(bootstrap), ...storedShippingReceiptToDraft(editInvoice) }
@@ -70,8 +75,8 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
     mode: 'controlled',
     initialValues,
     validate: {
-      date: (value) => (value.trim().length > 0 ? null : 'Date is required'),
-      time: (value) => (value.trim().length > 0 ? null : 'Time is required'),
+      date: requiredValue('Date'),
+      time: requiredValue('Time'),
       trackingNumber: (value) => {
         const text = value.trim()
         if (!text) return 'Tracking number is required'
@@ -89,16 +94,17 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
           return error instanceof Error ? error.message : 'Price is invalid'
         }
       },
-      insuranceAmount: (value) => {
-        if (value.trim().length === 0) return null
-        try {
-          parseMoneyToMinorUnits(value, 'Insurance amount')
-          return null
-        } catch (error) {
-          return error instanceof Error ? error.message : 'Insurance amount is invalid'
-        }
-      }
-      // shippingFrom is not a form field anymore — it comes from company settings; an empty block surfaces through normalizeShippingReceiptDraft.
+      service: requiredValue('Service'),
+      senderName: requiredValue('Sender name'),
+      senderStreet: requiredValue('Sender street'),
+      senderCity: requiredValue('Sender city'),
+      senderState: requiredValue('Sender state'),
+      senderZip: requiredValue('Sender ZIP'),
+      destCity: requiredValue('Destination city'),
+      destState: requiredValue('Destination state'),
+      destZip: requiredValue('Destination ZIP'),
+      weightLb: requiredValue('Weight in pounds'),
+      weightOz: requiredValue('Weight in ounces')
     }
   })
   
@@ -108,20 +114,18 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
   const receipt = useMemo(() => {
     const values = form.values
     const price = safeMoney(values.price)
-    const insurance = safeMoney(values.insuranceAmount)
+    const shipping = buildShippingReceiptFields(values)
     return {
       invoiceDate: values.date,
       invoiceTime: values.time,
       trackingNumber: values.trackingNumber,
       subtotal: price,
-      insurance,
-      total: price + insurance,
-      shippingFrom: values.shippingFrom,
+      insurance: 0,
+      total: price,
+      ...shipping,
       shippingService: values.service,
-      destinationAddress: values.destination,
-      packageWeight: values.weight,
       expectedDeliveryDate: values.expectedDeliveryDate,
-      insuranceLabel: values.insuranceLabel,
+      insuranceLabel: '',
       currency: values.currency
     }
   }, [form.values])

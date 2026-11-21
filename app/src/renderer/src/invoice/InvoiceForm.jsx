@@ -4,15 +4,80 @@ import {
   Flex,
   Group,
   ScrollArea,
+  Select,
   Stack,
   Text,
   TextInput,
   Title
 } from '@mantine/core'
-import { Select } from '@mantine/core'
 import { IconPrinter } from '@tabler/icons-react'
 import { SHIPPING_SERVICES } from '../../../shared/shipping-services.js'
 import { sanitizeMoneyInput } from '../../../shared/invoice.js'
+
+const US_STATE_OPTIONS = [
+  { value: 'AL', label: 'AL — Alabama' },
+  { value: 'AK', label: 'AK — Alaska' },
+  { value: 'AZ', label: 'AZ — Arizona' },
+  { value: 'AR', label: 'AR — Arkansas' },
+  { value: 'CA', label: 'CA — California' },
+  { value: 'CO', label: 'CO — Colorado' },
+  { value: 'CT', label: 'CT — Connecticut' },
+  { value: 'DE', label: 'DE — Delaware' },
+  { value: 'DC', label: 'DC — District of Columbia' },
+  { value: 'FL', label: 'FL — Florida' },
+  { value: 'GA', label: 'GA — Georgia' },
+  { value: 'GU', label: 'GU — Guam' },
+  { value: 'HI', label: 'HI — Hawaii' },
+  { value: 'ID', label: 'ID — Idaho' },
+  { value: 'IL', label: 'IL — Illinois' },
+  { value: 'IN', label: 'IN — Indiana' },
+  { value: 'IA', label: 'IA — Iowa' },
+  { value: 'KS', label: 'KS — Kansas' },
+  { value: 'KY', label: 'KY — Kentucky' },
+  { value: 'LA', label: 'LA — Louisiana' },
+  { value: 'ME', label: 'ME — Maine' },
+  { value: 'MD', label: 'MD — Maryland' },
+  { value: 'MA', label: 'MA — Massachusetts' },
+  { value: 'MI', label: 'MI — Michigan' },
+  { value: 'MN', label: 'MN — Minnesota' },
+  { value: 'MS', label: 'MS — Mississippi' },
+  { value: 'MO', label: 'MO — Missouri' },
+  { value: 'MT', label: 'MT — Montana' },
+  { value: 'NE', label: 'NE — Nebraska' },
+  { value: 'NV', label: 'NV — Nevada' },
+  { value: 'NH', label: 'NH — New Hampshire' },
+  { value: 'NJ', label: 'NJ — New Jersey' },
+  { value: 'NM', label: 'NM — New Mexico' },
+  { value: 'NY', label: 'NY — New York' },
+  { value: 'NC', label: 'NC — North Carolina' },
+  { value: 'ND', label: 'ND — North Dakota' },
+  { value: 'MP', label: 'MP — Northern Mariana Islands' },
+  { value: 'OH', label: 'OH — Ohio' },
+  { value: 'OK', label: 'OK — Oklahoma' },
+  { value: 'OR', label: 'OR — Oregon' },
+  { value: 'PA', label: 'PA — Pennsylvania' },
+  { value: 'PR', label: 'PR — Puerto Rico' },
+  { value: 'RI', label: 'RI — Rhode Island' },
+  { value: 'SC', label: 'SC — South Carolina' },
+  { value: 'SD', label: 'SD — South Dakota' },
+  { value: 'TN', label: 'TN — Tennessee' },
+  { value: 'TX', label: 'TX — Texas' },
+  { value: 'UT', label: 'UT — Utah' },
+  { value: 'VT', label: 'VT — Vermont' },
+  { value: 'VA', label: 'VA — Virginia' },
+  { value: 'VI', label: 'VI — U.S. Virgin Islands' },
+  { value: 'WA', label: 'WA — Washington' },
+  { value: 'WV', label: 'WV — West Virginia' },
+  { value: 'WI', label: 'WI — Wisconsin' },
+  { value: 'WY', label: 'WY — Wyoming' },
+  { value: 'AS', label: 'AS — American Samoa' }
+]
+
+function digitsOnly(value, maxLength) {
+  return String(value ?? '')
+    .replace(/\D/g, '')
+    .slice(0, maxLength)
+}
 
 function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false }) {
   return (
@@ -83,6 +148,7 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
                 label="Service"
                 data={SHIPPING_SERVICES}
                 allowDeselect={false}
+                required
                 style={{ flex: '1 1 180px' }}
                 key={form.key('service')}
                 {...form.getInputProps('service')}
@@ -93,33 +159,158 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
           <Divider />
 
           <section>
-            <Title order={4}>Addresses</Title>
+            <Title order={4}>Sender Address</Title>
             <Stack gap="xs" mt={6}>
-              {/* <Textarea
-                label="Shipping from"
-                description="One line each: name, street, city/state/ZIP, phone"
-                placeholder={'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036\n(800)275-8777'}
-                autosize
-                minRows={4}
-                maxRows={8}
-                required
-                key={form.key('shippingFrom')}
-                {...form.getInputProps('shippingFrom')}
-              /> */}
               <Flex gap="xs" wrap="wrap">
                 <TextInput
-                  label="Destination"
-                  placeholder="DANBURY CT 06810"
+                  label="Sender name"
+                  placeholder="DE MOSS"
+                  required
                   style={{ flex: '1 1 200px' }}
-                  key={form.key('destination')}
-                  {...form.getInputProps('destination')}
+                  key={form.key('senderName')}
+                  {...form.getInputProps('senderName')}
                 />
                 <TextInput
-                  label="Weight"
-                  placeholder="14 lb 6.0 oz"
+                  label="Street address"
+                  placeholder="5800 Corporate Dr"
+                  required
+                  style={{ flex: '2 1 240px' }}
+                  key={form.key('senderStreet')}
+                  {...form.getInputProps('senderStreet')}
+                />
+              </Flex>
+              <Flex gap="xs" wrap="wrap">
+                <TextInput
+                  label="City"
+                  placeholder="Houston"
+                  required
                   style={{ flex: '1 1 160px' }}
-                  key={form.key('weight')}
-                  {...form.getInputProps('weight')}
+                  key={form.key('senderCity')}
+                  {...form.getInputProps('senderCity')}
+                />
+                <Select
+                  label="State"
+                  data={US_STATE_OPTIONS}
+                  searchable
+                  allowDeselect={false}
+                  required
+                  style={{ flex: '1 1 180px' }}
+                  key={form.key('senderState')}
+                  {...form.getInputProps('senderState')}
+                />
+                <TextInput
+                  label="ZIP code"
+                  placeholder="77036"
+                  required
+                  style={{ flex: '1 1 120px' }}
+                  key={form.key('senderZip')}
+                  {...form.getInputProps('senderZip')}
+                />
+              </Flex>
+              <Text size="xs" c="dimmed" fw={600}>
+                Contact (optional)
+              </Text>
+              <Flex gap="xs" wrap="wrap">
+                <TextInput
+                  label="Area code"
+                  placeholder="800"
+                  inputMode="numeric"
+                  maxLength={3}
+                  style={{ flex: '1 1 100px' }}
+                  key={form.key('senderContactArea')}
+                  {...form.getInputProps('senderContactArea')}
+                  onChange={(event) =>
+                    form.setFieldValue(
+                      'senderContactArea',
+                      digitsOnly(event.currentTarget.value, 3)
+                    )
+                  }
+                />
+                <TextInput
+                  label="Prefix"
+                  placeholder="275"
+                  inputMode="numeric"
+                  maxLength={3}
+                  style={{ flex: '1 1 100px' }}
+                  key={form.key('senderContactPrefix')}
+                  {...form.getInputProps('senderContactPrefix')}
+                  onChange={(event) =>
+                    form.setFieldValue(
+                      'senderContactPrefix',
+                      digitsOnly(event.currentTarget.value, 3)
+                    )
+                  }
+                />
+                <TextInput
+                  label="Line number"
+                  placeholder="8777"
+                  inputMode="numeric"
+                  maxLength={4}
+                  style={{ flex: '1 1 120px' }}
+                  key={form.key('senderContactLine')}
+                  {...form.getInputProps('senderContactLine')}
+                  onChange={(event) =>
+                    form.setFieldValue(
+                      'senderContactLine',
+                      digitsOnly(event.currentTarget.value, 4)
+                    )
+                  }
+                />
+              </Flex>
+            </Stack>
+          </section>
+
+          <Divider />
+
+          <section>
+            <Title order={4}>Destination & Package</Title>
+            <Stack gap="xs" mt={6}>
+              <Flex gap="xs" wrap="wrap">
+                <TextInput
+                  label="Destination city"
+                  placeholder="DANBURY"
+                  required
+                  style={{ flex: '1 1 180px' }}
+                  key={form.key('destCity')}
+                  {...form.getInputProps('destCity')}
+                />
+                <Select
+                  label="State"
+                  data={US_STATE_OPTIONS}
+                  searchable
+                  allowDeselect={false}
+                  required
+                  style={{ flex: '1 1 180px' }}
+                  key={form.key('destState')}
+                  {...form.getInputProps('destState')}
+                />
+                <TextInput
+                  label="ZIP code"
+                  placeholder="06810"
+                  required
+                  style={{ flex: '1 1 120px' }}
+                  key={form.key('destZip')}
+                  {...form.getInputProps('destZip')}
+                />
+              </Flex>
+              <Flex gap="xs" wrap="wrap">
+                <TextInput
+                  label="Weight (lb)"
+                  placeholder="14"
+                  inputMode="numeric"
+                  required
+                  style={{ flex: '1 1 100px' }}
+                  key={form.key('weightLb')}
+                  {...form.getInputProps('weightLb')}
+                />
+                <TextInput
+                  label="Weight (oz)"
+                  placeholder="6"
+                  inputMode="decimal"
+                  required
+                  style={{ flex: '1 1 110px' }}
+                  key={form.key('weightOz')}
+                  {...form.getInputProps('weightOz')}
                 />
                 <TextInput
                   label="Expected delivery"
@@ -130,35 +321,6 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
                 />
               </Flex>
             </Stack>
-          </section>
-
-          <Divider />
-
-          <section>
-            <Title order={4}>Insurance</Title>
-            <Flex gap="xs" wrap="wrap" mt={6}>
-              <TextInput
-                label="Coverage label"
-                placeholder="Up to $100.00 included"
-                style={{ flex: '2 1 220px' }}
-                key={form.key('insuranceLabel')}
-                {...form.getInputProps('insuranceLabel')}
-              />
-              <TextInput
-                label="Insurance amount"
-                placeholder="0.00"
-                inputMode="decimal"
-                style={{ flex: '1 1 140px' }}
-                key={form.key('insuranceAmount')}
-                {...form.getInputProps('insuranceAmount')}
-                onChange={(event) =>
-                  form.setFieldValue(
-                    'insuranceAmount',
-                    sanitizeMoneyInput(event.currentTarget.value)
-                  )
-                }
-              />
-            </Flex>
           </section>
         </Stack>
       </ScrollArea>

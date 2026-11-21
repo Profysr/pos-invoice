@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  buildShippingReceiptFields,
   formatMoney,
   normalizeShippingReceiptDraft,
   parseMoneyToMinorUnits,
@@ -8,11 +9,13 @@ import {
   storedShippingReceiptToDraft
 } from '../src/shared/invoice.js'
 
-test('sanitizes money input down to digits and one decimal point', () => {
+test('sanitizes money input down to digits and two decimal places', () => {
   assert.equal(sanitizeMoneyInput('$76'), '76')
   assert.equal(sanitizeMoneyInput('1,234.56'), '1234.56')
   assert.equal(sanitizeMoneyInput('7.6.2'), '7.62')
+  assert.equal(sanitizeMoneyInput('1.123'), '1.12')
   assert.equal(sanitizeMoneyInput('.5'), '.5')
+  assert.equal(sanitizeMoneyInput('-1'), '')
   assert.equal(sanitizeMoneyInput('abc'), '')
 })
 
@@ -29,6 +32,40 @@ test('parses money into integer minor units', () => {
 test('formats money with the currency symbol', () => {
   assert.equal(formatMoney(1750, 'USD'), '$17.50')
   assert.equal(formatMoney(6522, 'USD'), '$65.22')
+})
+
+test('builds structured shipping fields and combines the sender contact', () => {
+  const fields = buildShippingReceiptFields({
+    senderName: 'DE MOSS',
+    senderStreet: '5800 Corporate Dr',
+    senderCity: 'Houston',
+    senderState: 'TX',
+    senderZip: '77036',
+    senderContactArea: '800',
+    senderContactPrefix: '275',
+    senderContactLine: '8777',
+    destCity: 'DANBURY',
+    destState: 'CT',
+    destZip: '06810',
+    weightLb: '14',
+    weightOz: '6.0'
+  })
+
+  assert.equal(fields.senderContact, '(800)275-8777')
+  assert.equal(fields.shippingFrom, 'DE MOSS\n5800 Corporate Dr\nHouston\nTX 77036\n(800)275-8777')
+  assert.equal(fields.destinationAddress, 'DANBURY, CT 06810')
+  assert.equal(fields.packageWeight, '14 lb 6.0 oz')
+})
+
+test('clears a stored sender contact when its input parts are emptied', () => {
+  const draft = storedShippingReceiptToDraft({ senderContact: '(800)275-8777' })
+  draft.senderContactArea = ''
+  draft.senderContactPrefix = ''
+  draft.senderContactLine = ''
+
+  const fields = buildShippingReceiptFields(draft)
+  assert.equal(fields.senderContact, '')
+  assert.equal(fields.shippingFrom, '')
 })
 
 test('normalizes a shipping receipt draft for persistence', () => {
@@ -146,6 +183,9 @@ test('round-trips a stored receipt back into draft values', () => {
   assert.equal(draft.senderState, 'TX')
   assert.equal(draft.senderZip, '77036')
   assert.equal(draft.senderContact, '(800)275-8777')
+  assert.equal(draft.senderContactArea, '800')
+  assert.equal(draft.senderContactPrefix, '275')
+  assert.equal(draft.senderContactLine, '8777')
   assert.equal(draft.destCity, 'DANBURY')
   assert.equal(draft.destState, 'CT')
   assert.equal(draft.destZip, '06810')
@@ -167,6 +207,9 @@ test('splits legacy receipt fields into structured draft values', () => {
   assert.equal(draft.senderState, 'TX')
   assert.equal(draft.senderZip, '77036')
   assert.equal(draft.senderContact, '(800)275-8777')
+  assert.equal(draft.senderContactArea, '800')
+  assert.equal(draft.senderContactPrefix, '275')
+  assert.equal(draft.senderContactLine, '8777')
   assert.equal(draft.destCity, 'DANBURY')
   assert.equal(draft.destState, 'CT')
   assert.equal(draft.destZip, '06810')

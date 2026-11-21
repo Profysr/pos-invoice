@@ -6,10 +6,6 @@ import CompanyMetadataSection from './CompanyMetadataSection'
 import PrinterSettingsSection from './PrinterSettingsSection'
 
 const defaultCompany = {
-  name: '',
-  address: '',
-  phone: '',
-  email: '',
   defaultCurrency: 'USD',
   logoPath: null,
   logoDataUrl: null
@@ -87,7 +83,7 @@ function SettingsModal({ opened, onClose }) {
       notifications.show({
         color: 'green',
         title: 'Company settings saved',
-        message: 'New invoices will use the updated company details.'
+        message: 'Logo and currency saved.'
       })
     } catch (saveError) {
       notifications.show({

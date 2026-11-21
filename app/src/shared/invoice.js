@@ -12,12 +12,14 @@ function optionalText(value, field) {
   return value.trim()
 }
 
-// Keep only what a money amount can hold: digits and a single decimal point.
+// Keep only what a money amount can hold: digits, one decimal point and two decimals.
 export function sanitizeMoneyInput(value) {
-  const cleaned = String(value ?? '').replace(/[^\d.]/g, '')
+  const raw = String(value ?? '')
+  if (raw.trim().startsWith('-')) return ''
+  const cleaned = raw.replace(/[^\d.]/g, '')
   const dot = cleaned.indexOf('.')
   if (dot === -1) return cleaned
-  return cleaned.slice(0, dot + 1) + cleaned.slice(dot + 1).replace(/\./g, '')
+  return cleaned.slice(0, dot + 1) + cleaned.slice(dot + 1).replace(/\./g, '').slice(0, 2)
 }
 
 export function parseMoneyToMinorUnits(value, field = 'Amount') {
@@ -51,38 +53,58 @@ export function formatMoney(minorUnits, currency = 'USD', locale = 'en-US') {
   }
 }
 
-function buildShippingFrom(values) {
-  const stateZip = [
-    optionalText(values?.senderState, 'Sender state'),
-    optionalText(values?.senderZip, 'Sender ZIP')
-  ]
-    .filter(Boolean)
-    .join(' ')
-
-  return [
-    optionalText(values?.senderName, 'Sender name'),
-    optionalText(values?.senderStreet, 'Sender street'),
-    optionalText(values?.senderCity, 'Sender city'),
-    stateZip,
-    optionalText(values?.senderContact, 'Sender contact')
-  ]
-    .filter(Boolean)
-    .join('\n')
+function formatSenderContact(values) {
+  const hasContactParts = ['senderContactArea', 'senderContactPrefix', 'senderContactLine'].some(
+    (key) => values?.[key] != null
+  )
+  if (hasContactParts) {
+    const area = optionalText(values?.senderContactArea, 'Sender contact area code')
+    const prefix = optionalText(values?.senderContactPrefix, 'Sender contact prefix')
+    const line = optionalText(values?.senderContactLine, 'Sender contact line number')
+    return area || prefix || line ? `(${area})${prefix}-${line}` : ''
+  }
+  return optionalText(values?.senderContact, 'Sender contact')
 }
 
-function buildDestinationAddress(values) {
-  const stateZip = [
-    optionalText(values?.destState, 'Destination state'),
-    optionalText(values?.destZip, 'Destination ZIP')
-  ]
-    .filter(Boolean)
-    .join(' ')
+export function buildShippingReceiptFields(values) {
+  const senderName = optionalText(values?.senderName, 'Sender name')
+  const senderStreet = optionalText(values?.senderStreet, 'Sender street')
+  const senderCity = optionalText(values?.senderCity, 'Sender city')
+  const senderState = optionalText(values?.senderState, 'Sender state')
+  const senderZip = optionalText(values?.senderZip, 'Sender ZIP')
+  const senderContact = formatSenderContact(values)
+  const destinationCity = optionalText(values?.destCity, 'Destination city')
+  const destinationState = optionalText(values?.destState, 'Destination state')
+  const destinationZip = optionalText(values?.destZip, 'Destination ZIP')
+  const weightLb = optionalText(values?.weightLb, 'Weight pounds')
+  const weightOz = optionalText(values?.weightOz, 'Weight ounces')
+  const senderStateZip = [senderState, senderZip].filter(Boolean).join(' ')
+  const destinationStateZip = [destinationState, destinationZip].filter(Boolean).join(' ')
 
-  return [optionalText(values?.destCity, 'Destination city'), stateZip].filter(Boolean).join(', ')
-}
-
-function buildPackageWeight(weightLb, weightOz) {
-  return weightLb || weightOz ? `${weightLb} lb ${weightOz} oz` : ''
+  return {
+    senderName,
+    senderStreet,
+    senderCity,
+    senderState,
+    senderZip,
+    senderContact,
+    destinationCity,
+    destinationState,
+    destinationZip,
+    shippingFrom: [
+      senderName,
+      senderStreet,
+      senderCity,
+      senderStateZip,
+      senderContact
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    destinationAddress: [destinationCity, destinationStateZip].filter(Boolean).join(', '),
+    packageWeight: [weightLb && `${weightLb} lb`, weightOz && `${weightOz} oz`]
+      .filter(Boolean)
+      .join(' ')
+  }
 }
 
 function legacySenderFields(value) {
@@ -134,19 +156,19 @@ function splitPackageWeight(value) {
   return { weightLb: match?.[1] || '', weightOz: match?.[2] || '' }
 }
 
-export function normalizeShippingReceiptDraft(values, id) {
-  const senderName = optionalText(values?.senderName, 'Sender name')
-  const senderStreet = optionalText(values?.senderStreet, 'Sender street')
-  const senderCity = optionalText(values?.senderCity, 'Sender city')
-  const senderState = optionalText(values?.senderState, 'Sender state')
-  const senderZip = optionalText(values?.senderZip, 'Sender ZIP')
-  const senderContact = optionalText(values?.senderContact, 'Sender contact')
-  const destinationCity = optionalText(values?.destCity, 'Destination city')
-  const destinationState = optionalText(values?.destState, 'Destination state')
-  const destinationZip = optionalText(values?.destZip, 'Destination ZIP')
-  const weightLb = optionalText(values?.weightLb, 'Weight pounds')
-  const weightOz = optionalText(values?.weightOz, 'Weight ounces')
+function splitSenderContact(value) {
+  const match = String(value ?? '')
+    .trim()
+    .match(/^\(?(\d{3})\)?[\s.-]?(\d{3})[\s.-]?(\d{4})$/)
+  return {
+    senderContactArea: match?.[1] || '',
+    senderContactPrefix: match?.[2] || '',
+    senderContactLine: match?.[3] || ''
+  }
+}
 
+export function normalizeShippingReceiptDraft(values, id) {
+  const shipping = buildShippingReceiptFields(values)
   const invoice = {
     id: requiredText(id, 'Receipt id'),
     invoiceNumber: requiredText(values?.invoiceNumber, 'Reference number'),
@@ -159,21 +181,10 @@ export function normalizeShippingReceiptDraft(values, id) {
     currency: requiredText(values?.currency ?? 'USD', 'Currency').toUpperCase(),
     insurance: 0,
     shippingService: optionalText(values?.service, 'Shipping service'),
-    senderName,
-    senderStreet,
-    senderCity,
-    senderState,
-    senderZip,
-    senderContact,
-    destinationCity,
-    destinationState,
-    destinationZip,
-    destinationAddress: buildDestinationAddress(values),
-    packageWeight: buildPackageWeight(weightLb, weightOz),
+    ...shipping,
     expectedDeliveryDate: optionalText(values?.expectedDeliveryDate, 'Expected delivery'),
     trackingNumber: requiredText(values?.trackingNumber, 'Tracking number'),
-    notes: '',
-    shippingFrom: buildShippingFrom(values)
+    notes: ''
   }
 
   if (invoice.currency.length !== 3) throw new Error('Currency must have three letters')
@@ -197,6 +208,9 @@ export function storedShippingReceiptToDraft(invoice) {
   const legacySender = legacySenderFields(invoice.shippingFrom)
   const legacyDestination = legacyDestinationFields(invoice.destinationAddress)
   const weight = splitPackageWeight(invoice.packageWeight)
+  const senderContact =
+    invoice.senderContact || invoice.sender_contact || legacySender.senderContact
+  const contact = splitSenderContact(senderContact)
 
   return {
     invoiceNumber: invoice.invoiceNumber,
@@ -210,7 +224,8 @@ export function storedShippingReceiptToDraft(invoice) {
     senderCity: invoice.senderCity || invoice.sender_city || legacySender.senderCity,
     senderState: invoice.senderState || invoice.sender_state || legacySender.senderState,
     senderZip: invoice.senderZip || invoice.sender_zip || legacySender.senderZip,
-    senderContact: invoice.senderContact || invoice.sender_contact || legacySender.senderContact,
+    senderContact,
+    ...contact,
     expectedDeliveryDate: invoice.expectedDeliveryDate || '',
     service: invoice.shippingService || '',
     destCity: invoice.destinationCity || invoice.destination_city || legacyDestination.destCity,

@@ -1,15 +1,11 @@
 import { useState } from 'react'
-import { Box, Button, Divider, Group, Image, Select, Stack, Text, Textarea, TextInput } from '@mantine/core'
+import { Box, Button, Divider, Group, Image, Select, Stack, Text } from '@mantine/core'
 import { useForm } from '@mantine/form'
 
 function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = false }) {
   const form = useForm({
     mode: 'uncontrolled',
     initialValues: {
-      name: initialData.name || '',
-      address: initialData.address || '',
-      phone: initialData.phone || '',
-      email: initialData.email || '',
       defaultCurrency: initialData.defaultCurrency || 'USD',
       logoPath: initialData.logoPath || null
     }
@@ -21,7 +17,7 @@ function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = fa
   const CURRENCY_OPTIONS = Intl.supportedValuesOf('currency').map((code) => ({
     value: code,
     label: `${code} — ${currencyNames.of(code)}`
-  }));
+  }))
 
   const chooseLogo = async () => {
     if (!onChooseLogo) return
@@ -46,32 +42,13 @@ function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = fa
     <form onSubmit={form.onSubmit(onSave)}>
       <Stack gap="md">
         <Box>
-          {/* <Text fw={600} size="sm" mb="xs">
-            Company
-          </Text> */}
-          <Stack gap="sm">
-            <TextInput
-              label="Company name"
-              placeholder="Business name shown on receipts"
-              // required
-              key={form.key('name')}
-              {...form.getInputProps('name')}
-            />
-            {/* <TextInput
-              label="Default currency"
-              placeholder="PKR"
-              description="Three-letter currency code used for new invoices"
-              key={form.key('defaultCurrency')}
-              {...form.getInputProps('defaultCurrency')}
-            /> */}
-            <Select
-              label="Default currency"
-              searchable
-              data={CURRENCY_OPTIONS}
-              key={form.key('defaultCurrency')}
-              {...form.getInputProps('defaultCurrency')}
-            />
-          </Stack>
+          <Select
+            label="Default currency"
+            searchable
+            data={CURRENCY_OPTIONS}
+            key={form.key('defaultCurrency')}
+            {...form.getInputProps('defaultCurrency')}
+          />
         </Box>
 
         <Divider />
@@ -124,47 +101,6 @@ function CompanyMetadataSection({ initialData, onSave, onChooseLogo, saving = fa
               )}
             </Stack>
           </Group>
-        </Box>
-
-        <Divider />
-
-        <Box>
-          {/* <Text fw={600} size="sm" mb="xs">
-            Address
-          </Text> */}
-          <Textarea
-            label="Address"
-            description="Receipt sender block — one line each: street, city/state/ZIP"
-            placeholder={'DE 5800 Corporate Dr Houston\nTX 77036'}
-            autosize
-            minRows={2}
-            maxRows={6}
-            key={form.key('address')}
-            {...form.getInputProps('address')}
-          />
-        </Box>
-
-        <Divider />
-
-        <Box>
-          <Text fw={600} size="sm" mb="xs">
-            Contact
-          </Text>
-          <Stack gap="sm">
-            <TextInput
-              label="Phone"
-              placeholder="+92 300 0000000"
-              key={form.key('phone')}
-              {...form.getInputProps('phone')}
-            />
-            <TextInput
-              label="Email"
-              type="email"
-              placeholder="billing@example.com"
-              key={form.key('email')}
-              {...form.getInputProps('email')}
-            />
-          </Stack>
         </Box>
 
         <Divider />
