@@ -26,11 +26,6 @@ export const RECEIPT_TEMPLATE = {
   version: 1,
   kind: 'receipt',
   blocks: [
-    // Optional company logo.
-    { type: 'if', when: 'logo', blocks: [
-      { type: 'image', width: '{{logoWidth}}', height: '{{logoHeight}}', data: '{{logoData}}', align: 'center' },
-    ]},
-
     // Shipping-from address, centered.
     { type: 'each', items: 'shippingFromLines', blocks: [
       { type: 'text', value: '{{this}}', align: 'center' },
@@ -122,7 +117,7 @@ export const RECEIPT_TEMPLATE = {
  * @param {object|null} logo - { width, height, data } base64 bitmap or null
  * @returns {[{}, object, object]} [data, profile] for retail-print-kit render()
  */
-export function buildReceiptViewModel(receipt, company, printer, logo = null) {
+export function buildReceiptViewModel(receipt, company, printer) {
   const width = Math.max(24, Number(printer.characterWidth) || 48)
   const currency = receipt.currency || company.defaultCurrency || 'USD'
   const money = (minorUnits) => formatMoney(minorUnits, currency)
@@ -155,10 +150,6 @@ export function buildReceiptViewModel(receipt, company, printer, logo = null) {
   }
 
   const data = {
-    logo: Boolean(logo),
-    logoWidth: logo ? logo.width : 0,
-    logoHeight: logo ? logo.height : 0,
-    logoData: logo ? logo.data : '',
     shippingFromLines,
     invoiceDate: receipt.invoiceDate || '',
     invoiceTime: receipt.invoiceTime || '',
@@ -199,11 +190,10 @@ export function buildReceiptViewModel(receipt, company, printer, logo = null) {
  *
  * @param {object} receipt
  * @param {object} company
- * @param {object} printer
- * @param {object|null} logo
+ * @param {object} printer - { characterWidth, paperWidthMm }
  * @returns {import('retail-print-kit').Op[]}
  */
-export function renderReceiptTemplate(receipt, company, printer, logo = null) {
-  const [data, profile] = buildReceiptViewModel(receipt, company, printer, logo)
+export function renderReceiptTemplate(receipt, company, printer) {
+  const [data, profile] = buildReceiptViewModel(receipt, company, printer)
   return render(RECEIPT_TEMPLATE, data, profile)
 }
