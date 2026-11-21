@@ -16,7 +16,6 @@ let mainWindow
 function defaultCompany() {
   return {
     name: '',
-    address: '',
     phone: '',
     email: '',
     defaultCurrency: 'USD',

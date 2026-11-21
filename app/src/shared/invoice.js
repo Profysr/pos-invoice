@@ -51,7 +51,102 @@ export function formatMoney(minorUnits, currency = 'USD', locale = 'en-US') {
   }
 }
 
+function buildShippingFrom(values) {
+  const stateZip = [
+    optionalText(values?.senderState, 'Sender state'),
+    optionalText(values?.senderZip, 'Sender ZIP')
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return [
+    optionalText(values?.senderName, 'Sender name'),
+    optionalText(values?.senderStreet, 'Sender street'),
+    optionalText(values?.senderCity, 'Sender city'),
+    stateZip,
+    optionalText(values?.senderContact, 'Sender contact')
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+function buildDestinationAddress(values) {
+  const stateZip = [
+    optionalText(values?.destState, 'Destination state'),
+    optionalText(values?.destZip, 'Destination ZIP')
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return [optionalText(values?.destCity, 'Destination city'), stateZip].filter(Boolean).join(', ')
+}
+
+function buildPackageWeight(weightLb, weightOz) {
+  return weightLb || weightOz ? `${weightLb} lb ${weightOz} oz` : ''
+}
+
+function legacySenderFields(value) {
+  const lines = String(value ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const fields = {
+    senderName: '',
+    senderStreet: '',
+    senderCity: '',
+    senderState: '',
+    senderZip: '',
+    senderContact: ''
+  }
+  if (!lines.length) return fields
+
+  fields.senderName = lines.shift()
+  if (/^(?:\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})$/.test(lines.at(-1) || '')) {
+    fields.senderContact = lines.pop()
+  }
+
+  const stateZipPattern = /^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/
+  const stateZipIndex = lines.findIndex((line) => stateZipPattern.test(line))
+  if (stateZipIndex !== -1) {
+    const [, state, zip] = lines[stateZipIndex].match(stateZipPattern)
+    fields.senderState = state.toUpperCase()
+    fields.senderZip = zip
+    lines.splice(stateZipIndex, 1)
+  }
+
+  if (lines.length) fields.senderStreet = lines.shift()
+  if (lines.length) fields.senderCity = lines.shift()
+  return fields
+}
+
+function legacyDestinationFields(value) {
+  const match = String(value ?? '')
+    .trim()
+    .match(/^(.+?)[,\s]+([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/)
+  if (!match) return { destCity: '', destState: '', destZip: '' }
+  return { destCity: match[1], destState: match[2].toUpperCase(), destZip: match[3] }
+}
+
+function splitPackageWeight(value) {
+  const match = String(value ?? '')
+    .trim()
+    .match(/^(\d+(?:\.\d+)?)\s+lb\s+(\d+(?:\.\d+)?)\s+oz$/i)
+  return { weightLb: match?.[1] || '', weightOz: match?.[2] || '' }
+}
+
 export function normalizeShippingReceiptDraft(values, id) {
+  const senderName = optionalText(values?.senderName, 'Sender name')
+  const senderStreet = optionalText(values?.senderStreet, 'Sender street')
+  const senderCity = optionalText(values?.senderCity, 'Sender city')
+  const senderState = optionalText(values?.senderState, 'Sender state')
+  const senderZip = optionalText(values?.senderZip, 'Sender ZIP')
+  const senderContact = optionalText(values?.senderContact, 'Sender contact')
+  const destinationCity = optionalText(values?.destCity, 'Destination city')
+  const destinationState = optionalText(values?.destState, 'Destination state')
+  const destinationZip = optionalText(values?.destZip, 'Destination ZIP')
+  const weightLb = optionalText(values?.weightLb, 'Weight pounds')
+  const weightOz = optionalText(values?.weightOz, 'Weight ounces')
+
   const invoice = {
     id: requiredText(id, 'Receipt id'),
     invoiceNumber: requiredText(values?.invoiceNumber, 'Reference number'),
@@ -62,18 +157,23 @@ export function normalizeShippingReceiptDraft(values, id) {
     customerEmail: '',
     customerAddress: '',
     currency: requiredText(values?.currency ?? 'USD', 'Currency').toUpperCase(),
-    insurance:
-      values?.insuranceAmount == null || String(values.insuranceAmount).trim() === ''
-        ? 0
-        : parseMoneyToMinorUnits(values.insuranceAmount, 'Insurance amount'),
+    insurance: 0,
     shippingService: optionalText(values?.service, 'Shipping service'),
-    destinationAddress: optionalText(values?.destination, 'Destination'),
-    packageWeight: optionalText(values?.weight, 'Weight'),
+    senderName,
+    senderStreet,
+    senderCity,
+    senderState,
+    senderZip,
+    senderContact,
+    destinationCity,
+    destinationState,
+    destinationZip,
+    destinationAddress: buildDestinationAddress(values),
+    packageWeight: buildPackageWeight(weightLb, weightOz),
     expectedDeliveryDate: optionalText(values?.expectedDeliveryDate, 'Expected delivery'),
     trackingNumber: requiredText(values?.trackingNumber, 'Tracking number'),
     notes: '',
-    shippingFrom: optionalText(values?.shippingFrom, 'Shipping from'),
-    insuranceLabel: optionalText(values?.insuranceLabel, 'Insurance label')
+    shippingFrom: buildShippingFrom(values)
   }
 
   if (invoice.currency.length !== 3) throw new Error('Currency must have three letters')
@@ -94,6 +194,10 @@ export function normalizeShippingReceiptDraft(values, id) {
 // Convert a stored receipt back into the editable draft values.
 export function storedShippingReceiptToDraft(invoice) {
   if (!invoice) throw new Error('Receipt is missing')
+  const legacySender = legacySenderFields(invoice.shippingFrom)
+  const legacyDestination = legacyDestinationFields(invoice.destinationAddress)
+  const weight = splitPackageWeight(invoice.packageWeight)
+
   return {
     invoiceNumber: invoice.invoiceNumber,
     date: invoice.invoiceDate,
@@ -101,12 +205,18 @@ export function storedShippingReceiptToDraft(invoice) {
     currency: invoice.currency,
     trackingNumber: invoice.trackingNumber,
     price: ((Number(invoice.subtotal) || 0) / 100).toFixed(2),
-    shippingFrom: invoice.shippingFrom || '',
+    senderName: invoice.senderName || invoice.sender_name || legacySender.senderName,
+    senderStreet: invoice.senderStreet || invoice.sender_street || legacySender.senderStreet,
+    senderCity: invoice.senderCity || invoice.sender_city || legacySender.senderCity,
+    senderState: invoice.senderState || invoice.sender_state || legacySender.senderState,
+    senderZip: invoice.senderZip || invoice.sender_zip || legacySender.senderZip,
+    senderContact: invoice.senderContact || invoice.sender_contact || legacySender.senderContact,
     expectedDeliveryDate: invoice.expectedDeliveryDate || '',
     service: invoice.shippingService || '',
-    destination: invoice.destinationAddress || '',
-    weight: invoice.packageWeight || '',
-    insuranceLabel: invoice.insuranceLabel || '',
-    insuranceAmount: ((Number(invoice.insurance) || 0) / 100).toFixed(2)
+    destCity: invoice.destinationCity || invoice.destination_city || legacyDestination.destCity,
+    destState: invoice.destinationState || invoice.destination_state || legacyDestination.destState,
+    destZip: invoice.destinationZip || invoice.destination_zip || legacyDestination.destZip,
+    weightLb: weight.weightLb,
+    weightOz: weight.weightOz
   }
 }

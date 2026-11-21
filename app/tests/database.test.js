@@ -36,12 +36,12 @@ test('stores settings, company metadata, and printer profiles', (t) => {
 
   const company = store.saveCompany({
     name: 'Example Company',
-    address: '10 Main Street',
     phone: '555-0100',
     email: 'hello@example.com',
     defaultCurrency: 'usd'
   })
   assert.equal(company.defaultCurrency, 'USD')
+  assert.equal('address' in company, false)
   assert.equal(store.getCompany().name, 'Example Company')
 
   const printer = store.savePrinter({
@@ -124,8 +124,16 @@ test('saves, calculates, updates, lists, and deletes an invoice', (t) => {
     customerName: 'Sample Customer',
     currency: 'usd',
     insurance: 250,
-    shippingFrom: 'DE MOSS\nDE 5800 Corporate Dr Houston',
-    insuranceLabel: 'Up to $100.00 included',
+    senderName: 'DE MOSS',
+    senderStreet: '5800 Corporate Dr',
+    senderCity: 'Houston',
+    senderState: 'TX',
+    senderZip: '77036',
+    senderContact: '(800)275-8777',
+    destinationCity: 'DANBURY',
+    destinationState: 'CT',
+    destinationZip: '06810',
+    packageWeight: '14 lb 6 oz',
     trackingNumber: '9201990367007536409945'
   }
   const items = [
@@ -142,8 +150,18 @@ test('saves, calculates, updates, lists, and deletes an invoice', (t) => {
   assert.equal(saved.subtotal, 1500)
   assert.equal(saved.total, 1750)
   assert.equal(saved.currency, 'USD')
-  assert.equal(saved.shippingFrom, 'DE MOSS\nDE 5800 Corporate Dr Houston')
-  assert.equal(saved.insuranceLabel, 'Up to $100.00 included')
+  assert.equal(saved.senderName, 'DE MOSS')
+  assert.equal(saved.senderStreet, '5800 Corporate Dr')
+  assert.equal(saved.senderCity, 'Houston')
+  assert.equal(saved.senderState, 'TX')
+  assert.equal(saved.senderZip, '77036')
+  assert.equal(saved.senderContact, '(800)275-8777')
+  assert.equal(saved.destinationCity, 'DANBURY')
+  assert.equal(saved.destinationState, 'CT')
+  assert.equal(saved.destinationZip, '06810')
+  assert.equal(saved.destinationAddress, 'DANBURY, CT 06810')
+  assert.equal(saved.shippingFrom, 'DE MOSS\n5800 Corporate Dr\nHouston\nTX 77036\n(800)275-8777')
+  assert.equal(saved.packageWeight, '14 lb 6 oz')
   assert.equal(saved.trackingNumber, '9201990367007536409945')
 
   const updated = store.saveInvoice({ ...invoice, insurance: 500 }, [
@@ -171,7 +189,9 @@ test('paginates and searches saved invoices', (t) => {
         invoiceTime: '10:30',
         currency: 'USD',
         trackingNumber: `92019903670075364099${index}`,
-        destinationAddress: index === 3 ? 'DANBURY CT 06810' : 'HOUSTON TX 77036'
+        destinationCity: index === 3 ? 'DANBURY' : 'HOUSTON',
+        destinationState: index === 3 ? 'CT' : 'TX',
+        destinationZip: index === 3 ? '06810' : '77036'
       },
       [
         {

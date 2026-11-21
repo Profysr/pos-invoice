@@ -39,24 +39,44 @@ test('normalizes a shipping receipt draft for persistence', () => {
       time: '18:06',
       trackingNumber: '9201990367007536409945',
       price: '65.22',
-      shippingFrom: 'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036',
+      senderName: 'DE MOSS',
+      senderStreet: '5800 Corporate Dr',
+      senderCity: 'Houston',
+      senderState: 'TX',
+      senderZip: '77036',
+      senderContact: '(800)275-8777',
       expectedDeliveryDate: '2026-08-13',
-      service: 'Prepaid Mail',
-      destination: 'DANBURY CT 06810',
-      weight: '14 lb 6.0 oz',
+      service: 'Priority Mail',
+      destCity: 'DANBURY',
+      destState: 'CT',
+      destZip: '06810',
+      weightLb: '14',
+      weightOz: '6.0',
       insuranceLabel: 'Up to $100.00 included',
-      insuranceAmount: '0.00',
+      insuranceAmount: '25.00',
       currency: 'usd'
     },
     'receipt-1'
   )
 
   assert.equal(invoice.currency, 'USD')
-  assert.equal(invoice.shippingFrom, 'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036')
-  assert.equal(invoice.insuranceLabel, 'Up to $100.00 included')
+  assert.equal(invoice.senderName, 'DE MOSS')
+  assert.equal(invoice.senderStreet, '5800 Corporate Dr')
+  assert.equal(invoice.senderCity, 'Houston')
+  assert.equal(invoice.senderState, 'TX')
+  assert.equal(invoice.senderZip, '77036')
+  assert.equal(invoice.senderContact, '(800)275-8777')
+  assert.equal(invoice.destinationCity, 'DANBURY')
+  assert.equal(invoice.destinationState, 'CT')
+  assert.equal(invoice.destinationZip, '06810')
+  assert.equal(invoice.destinationAddress, 'DANBURY, CT 06810')
+  assert.equal(invoice.packageWeight, '14 lb 6.0 oz')
+  assert.equal(invoice.shippingFrom, 'DE MOSS\n5800 Corporate Dr\nHouston\nTX 77036\n(800)275-8777')
   assert.equal(invoice.insurance, 0)
+  assert.equal('insuranceLabel' in invoice, false)
+  assert.equal('insuranceAmount' in invoice, false)
   assert.equal(items.length, 1)
-  assert.equal(items[0].description, 'Prepaid Mail')
+  assert.equal(items[0].description, 'Priority Mail')
   assert.equal(items[0].unitPrice, 6522)
 })
 
@@ -103,17 +123,53 @@ test('round-trips a stored receipt back into draft values', () => {
     trackingNumber: '9201990367007536409945',
     subtotal: 6522,
     insurance: 0,
-    shippingFrom: 'DE MOSS',
+    senderName: 'DE MOSS',
+    senderStreet: '5800 Corporate Dr',
+    senderCity: 'Houston',
+    senderState: 'TX',
+    senderZip: '77036',
+    senderContact: '(800)275-8777',
     expectedDeliveryDate: '2026-08-13',
-    shippingService: 'Prepaid Mail',
-    destinationAddress: 'DANBURY CT 06810',
-    packageWeight: '14 lb 6.0 oz',
-    insuranceLabel: 'Up to $100.00 included'
+    shippingService: 'Priority Mail',
+    destinationCity: 'DANBURY',
+    destinationState: 'CT',
+    destinationZip: '06810',
+    packageWeight: '14 lb 6.0 oz'
   }
 
   const draft = storedShippingReceiptToDraft(stored)
   assert.equal(draft.price, '65.22')
   assert.equal(draft.trackingNumber, '9201990367007536409945')
-  assert.equal(draft.shippingFrom, 'DE MOSS')
-  assert.equal(draft.insuranceAmount, '0.00')
+  assert.equal(draft.senderName, 'DE MOSS')
+  assert.equal(draft.senderStreet, '5800 Corporate Dr')
+  assert.equal(draft.senderCity, 'Houston')
+  assert.equal(draft.senderState, 'TX')
+  assert.equal(draft.senderZip, '77036')
+  assert.equal(draft.senderContact, '(800)275-8777')
+  assert.equal(draft.destCity, 'DANBURY')
+  assert.equal(draft.destState, 'CT')
+  assert.equal(draft.destZip, '06810')
+  assert.equal(draft.weightLb, '14')
+  assert.equal(draft.weightOz, '6.0')
+  assert.equal('insuranceAmount' in draft, false)
+})
+
+test('splits legacy receipt fields into structured draft values', () => {
+  const draft = storedShippingReceiptToDraft({
+    shippingFrom: 'DE MOSS\n5800 Corporate Dr\nHouston\nTX 77036\n(800)275-8777',
+    destinationAddress: 'DANBURY CT 06810',
+    packageWeight: '14 lb 6.0 oz'
+  })
+
+  assert.equal(draft.senderName, 'DE MOSS')
+  assert.equal(draft.senderStreet, '5800 Corporate Dr')
+  assert.equal(draft.senderCity, 'Houston')
+  assert.equal(draft.senderState, 'TX')
+  assert.equal(draft.senderZip, '77036')
+  assert.equal(draft.senderContact, '(800)275-8777')
+  assert.equal(draft.destCity, 'DANBURY')
+  assert.equal(draft.destState, 'CT')
+  assert.equal(draft.destZip, '06810')
+  assert.equal(draft.weightLb, '14')
+  assert.equal(draft.weightOz, '6.0')
 })

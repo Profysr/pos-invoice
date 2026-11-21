@@ -25,7 +25,6 @@ const migrations = [
       CREATE TABLE company_metadata (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         name TEXT NOT NULL,
-        address TEXT NOT NULL DEFAULT '',
         phone TEXT NOT NULL DEFAULT '',
         email TEXT NOT NULL DEFAULT '',
         default_currency TEXT NOT NULL DEFAULT 'USD',
@@ -66,10 +65,18 @@ const migrations = [
         insurance INTEGER NOT NULL DEFAULT 0 CHECK (insurance >= 0),
         total INTEGER NOT NULL DEFAULT 0 CHECK (total >= 0),
         shipping_service TEXT NOT NULL DEFAULT '',
-        destination_address TEXT NOT NULL DEFAULT '',
+        destination_city TEXT NOT NULL DEFAULT '',
+        destination_state TEXT NOT NULL DEFAULT '',
+        destination_zip TEXT NOT NULL DEFAULT '',
         package_weight TEXT NOT NULL DEFAULT '',
         expected_delivery_date TEXT,
         tracking_number TEXT NOT NULL DEFAULT '',
+        sender_name TEXT NOT NULL DEFAULT '',
+        sender_street TEXT NOT NULL DEFAULT '',
+        sender_city TEXT NOT NULL DEFAULT '',
+        sender_state TEXT NOT NULL DEFAULT '',
+        sender_zip TEXT NOT NULL DEFAULT '',
+        sender_contact TEXT NOT NULL DEFAULT '',
         notes TEXT NOT NULL DEFAULT '',
         print_status TEXT NOT NULL DEFAULT 'not_printed'
           CHECK (print_status IN ('not_printed', 'queued', 'printing', 'succeeded', 'failed')),
@@ -107,7 +114,6 @@ const migrations = [
   {
     version: 2,
     sql: `
-      ALTER TABLE invoices ADD COLUMN shipping_from TEXT NOT NULL DEFAULT '';
       ALTER TABLE invoices ADD COLUMN insurance_label TEXT NOT NULL DEFAULT '';
       ALTER TABLE printer_profiles ADD COLUMN dot_density REAL NOT NULL DEFAULT 8;
 
@@ -296,7 +302,6 @@ function mapCompany(row) {
   if (!row) return null
   return {
     name: row.name,
-    address: row.address,
     phone: row.phone,
     email: row.email,
     defaultCurrency: row.default_currency,
@@ -330,6 +335,22 @@ function mapPrinter(row) {
 
 function mapInvoice(row, items = []) {
   if (!row) return null
+  const destinationAddress = [
+    row.destination_city,
+    [row.destination_state, row.destination_zip].filter(Boolean).join(' ')
+  ]
+    .filter(Boolean)
+    .join(', ')
+  const shippingFrom = [
+    row.sender_name,
+    row.sender_street,
+    row.sender_city,
+    [row.sender_state, row.sender_zip].filter(Boolean).join(' '),
+    row.sender_contact
+  ]
+    .filter(Boolean)
+    .join('\n')
+
   return {
     id: row.id,
     invoiceNumber: row.invoice_number,
@@ -344,11 +365,20 @@ function mapInvoice(row, items = []) {
     insurance: row.insurance,
     total: row.total,
     shippingService: row.shipping_service,
-    destinationAddress: row.destination_address,
+    destinationCity: row.destination_city,
+    destinationState: row.destination_state,
+    destinationZip: row.destination_zip,
+    destinationAddress,
     packageWeight: row.package_weight,
     expectedDeliveryDate: row.expected_delivery_date,
     trackingNumber: row.tracking_number,
-    shippingFrom: row.shipping_from || '',
+    senderName: row.sender_name,
+    senderStreet: row.sender_street,
+    senderCity: row.sender_city,
+    senderState: row.sender_state,
+    senderZip: row.sender_zip,
+    senderContact: row.sender_contact,
+    shippingFrom,
     insuranceLabel: row.insurance_label || '',
     notes: row.notes,
     printStatus: row.print_status,
@@ -406,7 +436,6 @@ export function createDatabaseStore(databasePath) {
       // Every field except the currency is optional; all values are validated
       // before they reach the database.
       const name = boundedText(input?.name, 'Company name', 120)
-      const address = boundedText(input?.address, 'Company address', 300)
       const phone = boundedText(input?.phone, 'Company phone', 50)
       const email = optionalEmail(input?.email, 'Company email')
       const defaultCurrency = requiredText(input?.defaultCurrency, 'Default currency').toUpperCase()
@@ -424,11 +453,10 @@ export function createDatabaseStore(databasePath) {
       database
         .prepare(
           `INSERT INTO company_metadata
-             (id, name, address, phone, email, default_currency, logo_path, created_at, updated_at)
-           VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+             (id, name, phone, email, default_currency, logo_path, created_at, updated_at)
+           VALUES (1, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              name = excluded.name,
-             address = excluded.address,
              phone = excluded.phone,
              email = excluded.email,
              default_currency = excluded.default_currency,
@@ -437,7 +465,6 @@ export function createDatabaseStore(databasePath) {
         )
         .run(
           name,
-          address,
           phone,
           email,
           defaultCurrency,
@@ -551,9 +578,9 @@ export function createDatabaseStore(databasePath) {
       const offset = (Math.max(Number(page) || 1, 1) - 1) * limit
       const query = String(search ?? '').trim()
       const filter = query
-        ? 'WHERE instr(lower(invoice_number), lower(?)) > 0 OR instr(lower(tracking_number), lower(?)) > 0 OR instr(lower(destination_address), lower(?)) > 0'
+        ? 'WHERE instr(lower(invoice_number), lower(?)) > 0 OR instr(lower(tracking_number), lower(?)) > 0 OR instr(lower(destination_city), lower(?)) > 0 OR instr(lower(destination_state), lower(?)) > 0 OR instr(lower(destination_zip), lower(?)) > 0'
         : ''
-      const params = query ? [query, query, query] : []
+      const params = query ? [query, query, query, query, query] : []
       const total = database
         .prepare(`SELECT COUNT(*) AS count FROM invoices ${filter}`)
         .get(...params).count
@@ -603,10 +630,16 @@ export function createDatabaseStore(databasePath) {
             `INSERT INTO invoices
                (id, invoice_number, invoice_date, invoice_time, customer_name, customer_phone,
                 customer_email, customer_address, currency, subtotal, insurance, total,
-                shipping_service, destination_address, package_weight, expected_delivery_date,
-                tracking_number, shipping_from, insurance_label, notes, print_status,
-                created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                shipping_service, destination_city, destination_state, destination_zip,
+                package_weight, expected_delivery_date, tracking_number,
+                sender_name, sender_street, sender_city, sender_state, sender_zip, sender_contact,
+                insurance_label, notes, print_status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?,
+                     ?, ?, ?, ?, ?,
+                     ?, ?, ?, ?, ?,
+                     ?, ?, ?, ?, ?,
+                     ?, ?, ?, ?, ?,
+                     ?, ?, ?, ?, ?)
              ON CONFLICT(id) DO UPDATE SET
                invoice_number = excluded.invoice_number,
                invoice_date = excluded.invoice_date,
@@ -620,11 +653,18 @@ export function createDatabaseStore(databasePath) {
                insurance = excluded.insurance,
                total = excluded.total,
                shipping_service = excluded.shipping_service,
-               destination_address = excluded.destination_address,
+               destination_city = excluded.destination_city,
+               destination_state = excluded.destination_state,
+               destination_zip = excluded.destination_zip,
                package_weight = excluded.package_weight,
                expected_delivery_date = excluded.expected_delivery_date,
                tracking_number = excluded.tracking_number,
-               shipping_from = excluded.shipping_from,
+               sender_name = excluded.sender_name,
+               sender_street = excluded.sender_street,
+               sender_city = excluded.sender_city,
+               sender_state = excluded.sender_state,
+               sender_zip = excluded.sender_zip,
+               sender_contact = excluded.sender_contact,
                insurance_label = excluded.insurance_label,
                notes = excluded.notes,
                print_status = excluded.print_status,
@@ -644,13 +684,20 @@ export function createDatabaseStore(databasePath) {
             insurance,
             total,
             optionalText(input?.shippingService, 'Shipping service'),
-            optionalText(input?.destinationAddress, 'Destination address'),
+            optionalText(input?.destinationCity, 'Destination city'),
+            optionalText(input?.destinationState, 'Destination state'),
+            optionalText(input?.destinationZip, 'Destination ZIP'),
             optionalText(input?.packageWeight, 'Package weight'),
             input?.expectedDeliveryDate
               ? optionalText(input.expectedDeliveryDate, 'Expected delivery date')
               : null,
             optionalText(input?.trackingNumber, 'Tracking number'),
-            optionalText(input?.shippingFrom, 'Shipping from'),
+            optionalText(input?.senderName, 'Sender name'),
+            optionalText(input?.senderStreet, 'Sender street'),
+            optionalText(input?.senderCity, 'Sender city'),
+            optionalText(input?.senderState, 'Sender state'),
+            optionalText(input?.senderZip, 'Sender ZIP'),
+            optionalText(input?.senderContact, 'Sender contact'),
             optionalText(input?.insuranceLabel, 'Insurance label'),
             optionalText(input?.notes, 'Invoice notes'),
             existing?.printStatus ?? 'not_printed',
