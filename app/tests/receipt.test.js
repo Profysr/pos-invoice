@@ -13,7 +13,6 @@ const receipt = {
   shippingService: 'Prepaid Mail',
   destinationAddress: 'DANBURY CT 06810',
   packageWeight: '14 lb 6.0 oz',
-  insuranceLabel: 'Up to $100.00 included',
   currency: 'USD'
 }
 
@@ -55,6 +54,10 @@ test('builds the shipping receipt template', () => {
   assert.match(text, /Tracking #:/)
   assert.match(text, /9201 9903 6700 7536 4099 45/)
   assert.match(text, /Up to \$100\.00 included\s+\$0\.00/)
+  assert.ok(
+    text.indexOf('Up to $100.00 included') < text.indexOf('\nTotal'),
+    'insurance is printed before Total'
+  )
   assert.match(text, /Total\s+\$65\.22/)
   assert.match(text, /Grand Total:\s+\$65\.22/)
   assert.match(text, /Text your tracking number to 28777/)
@@ -70,16 +73,15 @@ test('keeps every printed line inside the printer character width', () => {
   }
 })
 
-test('omits optional shipping details that are not filled in', () => {
+test('omits optional shipping details while keeping fixed insurance', () => {
   const lines = build({
     destinationAddress: '',
     packageWeight: '',
-    insuranceLabel: '',
     insurance: 0
   })
   const text = lines.map((line) => line.text ?? '').join('\n')
 
   assert.doesNotMatch(text, /Weight:/)
   assert.doesNotMatch(text, /DANBURY/)
-  assert.doesNotMatch(text, /Up to \$100\.00/)
+  assert.match(text, /Up to \$100\.00 included\s+\$0\.00/)
 })

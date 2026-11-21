@@ -21,6 +21,7 @@ test('sanitizes money input down to digits and two decimal places', () => {
 
 test('parses money into integer minor units', () => {
   assert.equal(parseMoneyToMinorUnits('1234'), 123400)
+  assert.equal(parseMoneyToMinorUnits('1,234.56'), 123456)
   assert.equal(parseMoneyToMinorUnits('1234.5'), 123450)
   assert.equal(parseMoneyToMinorUnits('.5'), 50)
   assert.equal(parseMoneyToMinorUnits('0.00'), 0)

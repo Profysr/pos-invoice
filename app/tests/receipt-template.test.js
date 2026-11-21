@@ -14,7 +14,6 @@ const receipt = {
   shippingService: 'Prepaid Mail',
   destinationAddress: 'DANBURY CT 06810',
   packageWeight: '14 lb 6.0 oz',
-  insuranceLabel: 'Up to $100.00 included',
   currency: 'USD'
 }
 
@@ -40,8 +39,14 @@ test('renders the full shipping receipt with all sections', () => {
   assert.ok(text.some((t) => t.includes('Weight: 14 lb 6.0 oz')), 'weight present')
   assert.ok(text.some((t) => t.includes('Expected Delivery Date:')), 'delivery present')
   assert.ok(text.some((t) => t.includes('Tracking #:')), 'tracking present')
+  assert.ok(text.some((t) => t.includes('Up to $100.00 included')), 'fixed insurance present')
+  assert.ok(text.some((t) => t.includes('$0.00')), 'fixed insurance amount present')
   assert.ok(text.some((t) => t.includes('$65.22')), 'total present')
   assert.ok(text.some((t) => t.includes('Text your tracking number to 28777')), 'footer present')
+
+  const insuranceIndex = text.findIndex((t) => t.includes('Up to $100.00 included'))
+  const totalIndex = text.findIndex((t) => t.includes('Total'))
+  assert.ok(insuranceIndex >= 0 && insuranceIndex < totalIndex, 'insurance is printed before Total')
 })
 
 test('encodes to valid ESC/POS bytes for the 80 mm generic profile', () => {
@@ -52,19 +57,32 @@ test('encodes to valid ESC/POS bytes for the 80 mm generic profile', () => {
   assert.ok(bytes.toString('latin1').includes('Prepaid Mail'))
 })
 
-test('omits optional shipping details that are not filled in', () => {
+test('omits optional shipping details while keeping fixed insurance', () => {
   const ops = renderReceiptTemplate({
     ...receipt,
     destinationAddress: '',
     packageWeight: '',
-    insuranceLabel: '',
     insurance: 0
   }, company, printer)
 
   const text = opsText(ops)
   assert.ok(!text.some((t) => t.includes('DANBURY')), 'destination omitted')
   assert.ok(!text.some((t) => t.includes('Weight:')), 'weight omitted')
-  assert.ok(!text.some((t) => t.includes('Up to $100.00')), 'insurance label omitted')
+  assert.ok(text.some((t) => t.includes('Up to $100.00 included')), 'fixed insurance kept')
+  assert.ok(text.some((t) => t.includes('$0.00')), 'fixed insurance amount kept')
+})
+
+test('keeps the fixed insurance row on one line at supported paper widths', () => {
+  for (const characterWidth of [32, 42, 48]) {
+    const text = opsText(
+      renderReceiptTemplate(receipt, company, { characterWidth, paperWidthMm: 80 })
+    )
+    assert.ok(
+      text.some((t) => t.includes('Up to $100.00 included') && t.includes('$0.00')),
+      `insurance row is not on one line at ${characterWidth} columns`
+    )
+    assert.ok(!text.includes('included'), `insurance label wrapped at ${characterWidth} columns`)
+  }
 })
 
 test('wraps long product descriptions to the printer width', () => {
@@ -126,7 +144,7 @@ test('formats large amounts', () => {
 
   const text = opsText(ops)
   assert.ok(text.some((t) => t.includes('$12,345.67')), 'large subtotal formatted')
-  assert.ok(text.some((t) => t.includes('$12,434.67')), 'grand total formatted')
+  assert.ok(!text.some((t) => t.includes('$12,434.67')), 'stored insurance is ignored')
 })
 
 test('uses 58 mm profile when paper width is 58', () => {

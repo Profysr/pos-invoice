@@ -125,7 +125,6 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
       ...shipping,
       shippingService: values.service,
       expectedDeliveryDate: values.expectedDeliveryDate,
-      insuranceLabel: '',
       currency: values.currency
     }
   }, [form.values])

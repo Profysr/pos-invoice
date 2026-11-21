@@ -1,6 +1,7 @@
 import {
   Button,
   Divider,
+  Fieldset,
   Flex,
   Group,
   ScrollArea,
@@ -106,59 +107,6 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
       <ScrollArea flex={1} mih={0} offsetScrollbars="y" scrollbarSize={8}>
         <Stack gap="sm">
           <section>
-            <Title order={4}>Shipment</Title>
-            <Flex gap="xs" wrap="wrap" mt={6}>
-              <TextInput
-                label="Date"
-                type="date"
-                required
-                style={{ flex: '1 1 140px' }}
-                key={form.key('date')}
-                {...form.getInputProps('date')}
-              />
-              <TextInput
-                label="Time"
-                type="time"
-                required
-                style={{ flex: '1 1 110px' }}
-                key={form.key('time')}
-                {...form.getInputProps('time')}
-              />
-              <TextInput
-                label="Tracking number"
-                placeholder="9201990367007536409945"
-                required
-                style={{ flex: '2 1 220px' }}
-                key={form.key('trackingNumber')}
-                {...form.getInputProps('trackingNumber')}
-              />
-              <TextInput
-                label="Price"
-                placeholder="65.22"
-                inputMode="decimal"
-                required
-                style={{ flex: '1 1 110px' }}
-                key={form.key('price')}
-                {...form.getInputProps('price')}
-                onChange={(event) =>
-                  form.setFieldValue('price', sanitizeMoneyInput(event.currentTarget.value))
-                }
-              />
-              <Select
-                label="Service"
-                data={SHIPPING_SERVICES}
-                allowDeselect={false}
-                required
-                style={{ flex: '1 1 180px' }}
-                key={form.key('service')}
-                {...form.getInputProps('service')}
-              />
-            </Flex>
-          </section>
-
-          <Divider />
-
-          <section>
             <Title order={4}>Sender Address</Title>
             <Stack gap="xs" mt={6}>
               <Flex gap="xs" wrap="wrap">
@@ -207,57 +155,109 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
                   {...form.getInputProps('senderZip')}
                 />
               </Flex>
-              <Text size="xs" c="dimmed" fw={600}>
-                Contact (optional)
-              </Text>
-              <Flex gap="xs" wrap="wrap">
-                <TextInput
-                  label="Area code"
-                  placeholder="800"
-                  inputMode="numeric"
-                  maxLength={3}
-                  style={{ flex: '1 1 100px' }}
-                  key={form.key('senderContactArea')}
-                  {...form.getInputProps('senderContactArea')}
-                  onChange={(event) =>
-                    form.setFieldValue(
-                      'senderContactArea',
-                      digitsOnly(event.currentTarget.value, 3)
-                    )
-                  }
-                />
-                <TextInput
-                  label="Prefix"
-                  placeholder="275"
-                  inputMode="numeric"
-                  maxLength={3}
-                  style={{ flex: '1 1 100px' }}
-                  key={form.key('senderContactPrefix')}
-                  {...form.getInputProps('senderContactPrefix')}
-                  onChange={(event) =>
-                    form.setFieldValue(
-                      'senderContactPrefix',
-                      digitsOnly(event.currentTarget.value, 3)
-                    )
-                  }
-                />
-                <TextInput
-                  label="Line number"
-                  placeholder="8777"
-                  inputMode="numeric"
-                  maxLength={4}
-                  style={{ flex: '1 1 120px' }}
-                  key={form.key('senderContactLine')}
-                  {...form.getInputProps('senderContactLine')}
-                  onChange={(event) =>
-                    form.setFieldValue(
-                      'senderContactLine',
-                      digitsOnly(event.currentTarget.value, 4)
-                    )
-                  }
-                />
-              </Flex>
+              <Fieldset legend="Shipping contact (optional)" variant="default">
+                <Group gap="xs" wrap="wrap">
+                  <TextInput
+                    label="Area code"
+                    placeholder="800"
+                    inputMode="numeric"
+                    maxLength={3}
+                    style={{ flex: '1 1 100px' }}
+                    key={form.key('senderContactArea')}
+                    {...form.getInputProps('senderContactArea')}
+                    onChange={(event) =>
+                      form.setFieldValue(
+                        'senderContactArea',
+                        digitsOnly(event.currentTarget.value, 3)
+                      )
+                    }
+                  />
+                  <TextInput
+                    label="Prefix"
+                    placeholder="275"
+                    inputMode="numeric"
+                    maxLength={3}
+                    style={{ flex: '1 1 100px' }}
+                    key={form.key('senderContactPrefix')}
+                    {...form.getInputProps('senderContactPrefix')}
+                    onChange={(event) =>
+                      form.setFieldValue(
+                        'senderContactPrefix',
+                        digitsOnly(event.currentTarget.value, 3)
+                      )
+                    }
+                  />
+                  <TextInput
+                    label="Line number"
+                    placeholder="8777"
+                    inputMode="numeric"
+                    maxLength={4}
+                    style={{ flex: '1 1 120px' }}
+                    key={form.key('senderContactLine')}
+                    {...form.getInputProps('senderContactLine')}
+                    onChange={(event) =>
+                      form.setFieldValue(
+                        'senderContactLine',
+                        digitsOnly(event.currentTarget.value, 4)
+                      )
+                    }
+                  />
+                </Group>
+              </Fieldset>
             </Stack>
+          </section>
+
+          <Divider />
+
+          <section>
+            <Title order={4}>Shipment</Title>
+            <Flex gap="xs" wrap="wrap" mt={6}>
+              <Select
+                label="Service"
+                data={SHIPPING_SERVICES}
+                allowDeselect={false}
+                required
+                style={{ flex: '1 1 180px' }}
+                key={form.key('service')}
+                {...form.getInputProps('service')}
+              />
+              <TextInput
+                label="Date"
+                type="date"
+                required
+                style={{ flex: '1 1 140px' }}
+                key={form.key('date')}
+                {...form.getInputProps('date')}
+              />
+              <TextInput
+                label="Time"
+                type="time"
+                required
+                style={{ flex: '1 1 110px' }}
+                key={form.key('time')}
+                {...form.getInputProps('time')}
+              />
+              <TextInput
+                label="Tracking number"
+                placeholder="9201990367007536409945"
+                required
+                style={{ flex: '2 1 220px' }}
+                key={form.key('trackingNumber')}
+                {...form.getInputProps('trackingNumber')}
+              />
+              <TextInput
+                label="Price"
+                placeholder="65.22"
+                inputMode="decimal"
+                required
+                style={{ flex: '1 1 110px' }}
+                key={form.key('price')}
+                {...form.getInputProps('price')}
+                onChange={(event) =>
+                  form.setFieldValue('price', sanitizeMoneyInput(event.currentTarget.value))
+                }
+              />
+            </Flex>
           </section>
 
           <Divider />
@@ -293,33 +293,34 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
                   {...form.getInputProps('destZip')}
                 />
               </Flex>
-              <Flex gap="xs" wrap="wrap">
-                <TextInput
-                  label="Weight (lb)"
-                  placeholder="14"
-                  inputMode="numeric"
-                  required
-                  style={{ flex: '1 1 100px' }}
-                  key={form.key('weightLb')}
-                  {...form.getInputProps('weightLb')}
-                />
-                <TextInput
-                  label="Weight (oz)"
-                  placeholder="6"
-                  inputMode="decimal"
-                  required
-                  style={{ flex: '1 1 110px' }}
-                  key={form.key('weightOz')}
-                  {...form.getInputProps('weightOz')}
-                />
-                <TextInput
-                  label="Expected delivery"
-                  type="date"
-                  style={{ flex: '1 1 160px' }}
-                  key={form.key('expectedDeliveryDate')}
-                  {...form.getInputProps('expectedDeliveryDate')}
-                />
-              </Flex>
+              <Fieldset legend="Package weight" variant="unstyled">
+                <Group gap="xs" wrap="wrap">
+                  <TextInput
+                    label="Weight (lb)"
+                    placeholder="14"
+                    inputMode="numeric"
+                    required
+                    style={{ flex: '1 1 100px' }}
+                    key={form.key('weightLb')}
+                    {...form.getInputProps('weightLb')}
+                  />
+                  <TextInput
+                    label="Weight (oz)"
+                    placeholder="6"
+                    inputMode="decimal"
+                    required
+                    style={{ flex: '1 1 110px' }}
+                    key={form.key('weightOz')}
+                    {...form.getInputProps('weightOz')}
+                  />
+                </Group>
+              </Fieldset>
+              <TextInput
+                label="Expected delivery"
+                type="date"
+                key={form.key('expectedDeliveryDate')}
+                {...form.getInputProps('expectedDeliveryDate')}
+              />
             </Stack>
           </section>
         </Stack>

@@ -14,7 +14,7 @@ import { wrapText } from './receipt.js'
  * - table header + product row
  * - blank separator
  * - optional destination / weight / delivery date / tracking
- * - optional insurance line
+ * - fixed insurance line
  * - total + grand total + dividers
  * - footer paragraphs (centered, wrapped)
  * - optional company logo image block
@@ -78,12 +78,10 @@ export const RECEIPT_TEMPLATE = {
     // Blank line before totals.
     { type: 'newline', count: 1 },
 
-    // Insurance line (only when present).
-    { type: 'if', when: 'insuranceLabel', blocks: [
-      { type: 'row', cells: [
-        { value: '{{insuranceLabel}}', align: 'LEFT' },
-        { value: '{{insurance}}', align: 'RIGHT' },
-      ] },
+    // Fixed insurance line.
+    { type: 'row', cells: [
+      { value: 'Up to $100.00 included', align: 'LEFT', width: 0.8 },
+      { value: '$0.00', align: 'RIGHT', width: 0.2 },
     ]},
 
     // Total.
@@ -124,14 +122,12 @@ export function buildReceiptViewModel(receipt, company, printer) {
   const money = (minorUnits) => formatMoney(minorUnits, currency)
 
   const price = Number(receipt.subtotal) || 0
-  const insurance = Number(receipt.insurance) || 0
-  const total = price + insurance
+  const total = price
 
   const shippingFromLines = String(receipt.shippingFrom ?? '').split('\n').map((l) => l.trim()).filter(Boolean)
 
   const product = receipt.shippingService || 'Prepaid Mail'
   const priceFormatted = money(price)
-  const insuranceFormatted = money(insurance)
   const totalFormatted = money(total)
 
   // Multi-item support: use receipt.items when provided, otherwise a single
@@ -167,8 +163,6 @@ export function buildReceiptViewModel(receipt, company, printer) {
     packageWeight: receipt.packageWeight || '',
     expectedDeliveryDate: formatReceiptDate(receipt.expectedDeliveryDate),
     trackingNumber: groupTrackingNumber(receipt.trackingNumber),
-    insuranceLabel: receipt.insuranceLabel || '',
-    insurance: insuranceFormatted,
     totalLabel: 'Total',
     total: totalFormatted,
     grandTotalLabel: 'Grand Total:',

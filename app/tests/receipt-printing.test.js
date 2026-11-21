@@ -27,7 +27,6 @@ const receipt = {
   shippingService: 'Prepaid Mail',
   destinationAddress: 'DANBURY CT 06810',
   packageWeight: '14 lb 6.0 oz',
-  insuranceLabel: 'Up to $100.00 included',
   currency: 'USD'
 }
 
@@ -52,6 +51,8 @@ test('encodeReceipt generates ESC/POS bytes without a logo', async () => {
   const latin = bytes.toString('latin1')
   assert.ok(latin.includes('DE MOSS'), 'shipping from present')
   assert.ok(latin.includes('Prepaid Mail'), 'product present')
+  assert.ok(latin.includes('Up to $100.00 included'), 'fixed insurance present')
+  assert.ok(latin.includes('$0.00'), 'fixed insurance amount present')
   assert.ok(latin.includes('$65.22'), 'total present')
   assert.ok(latin.includes('Text your tracking number to 28777'), 'footer present')
 })

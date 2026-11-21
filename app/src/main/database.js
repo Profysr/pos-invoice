@@ -594,8 +594,8 @@ export function createDatabaseStore(databasePath) {
         return { id: itemId, position, description, quantityMilli, unitPrice, lineTotal }
       })
       const subtotal = normalizedItems.reduce((sum, item) => sum + item.lineTotal, 0)
-      const insurance = nonNegativeInteger(input?.insurance ?? 0, 'Insurance')
-      const total = subtotal + insurance
+      const insurance = 0
+      const total = subtotal
       const existing = store.getInvoice(id)
       const timestamp = now()
 

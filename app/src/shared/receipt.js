@@ -78,8 +78,7 @@ export function buildShippingReceiptLines({ receipt = {}, company = {}, printer 
   const currency = receipt.currency || company.defaultCurrency || 'USD'
   const money = (minorUnits) => formatMoney(minorUnits, currency)
   const price = Number(receipt.subtotal) || 0
-  const insurance = Number(receipt.insurance) || 0
-  const total = price + insurance
+  const total = price
   const lines = []
 
   if (company.logoPath || company.logoDataUrl) lines.push({ type: 'logo' })
@@ -134,12 +133,10 @@ export function buildShippingReceiptLines({ receipt = {}, company = {}, printer 
   )
 
   lines.push({ text: '', align: 'left' })
-  if (receipt.insuranceLabel || insurance > 0) {
-    lines.push({
-      text: formatColumns(receipt.insuranceLabel || 'Insurance', money(insurance), width),
-      align: 'left'
-    })
-  }
+  lines.push({
+    text: formatColumns('Up to $100.00 included', '$0.00', width),
+    align: 'left'
+  })
 
   // Space between the shipped item row and the totals block.
   // lines.push({ text: '', align: 'left' })
