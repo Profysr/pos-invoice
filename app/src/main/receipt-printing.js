@@ -1,5 +1,6 @@
 import { encodeEscPos, NetTransport, render } from 'retail-print-kit'
-import { RECEIPT_TEMPLATE, buildReceiptViewModel } from '../shared/receipt-template.js'
+import { RECEIPT_TEMPLATE, buildReceiptViewModel } from '../shared/receipt-template-core.js'
+import { opsToReceiptLines } from '../shared/receipt-ops-lines.js'
 
 /**
  * Lazily rasterize a company logo using the existing Electron `nativeImage`
@@ -28,6 +29,19 @@ export async function rasterizeReceiptLogo(logoPath, { widthDots = 400 } = {}) {
  */
 export function logoWidthDots(printer) {
   return Math.round(((Number(printer.printableWidthMm) || 72) * (Number(printer.dotDensity) || 8)) * 0.7)
+}
+
+/**
+ * Build canonical receipt lines for the Windows system-print path.
+ * The template and operations are shared with LAN printing and the preview.
+ */
+export function buildReceiptPrintLines(receipt, company = {}, printer = {}) {
+  const [data, profile] = buildReceiptViewModel(receipt, company, printer)
+  const ops = render(RECEIPT_TEMPLATE, data, profile)
+  return opsToReceiptLines(ops, {
+    width: profile.columns.a,
+    logo: Boolean(company.logoPath || company.logoDataUrl)
+  })
 }
 
 /**

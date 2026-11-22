@@ -30,8 +30,8 @@ import {
   normalizeShippingReceiptDraft,
   storedShippingReceiptToDraft
 } from '../../../shared/invoice.js'
-import { buildShippingReceiptLines } from '../../../shared/receipt.js'
 import ReceiptPreview from '../invoice/ReceiptPreview.jsx'
+import { buildReceiptPreviewLines } from '../invoice/receipt-preview-lines.js'
 import './SavedInvoicesPage.css'
 
 const ROWS_PER_PAGE_DEFAULT = 15
@@ -106,12 +106,12 @@ function SavedInvoicesPage({ onEdit }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   const viewingReceipt = useMemo(() => {
-    if (!viewing?.invoice) return []
-    return buildShippingReceiptLines({
-      receipt: viewing.invoice,
-      company: viewing.company || {},
-      printer: viewing.printer || {}
-    })
+    if (!viewing?.invoice) return { lines: [], error: '' }
+    return buildReceiptPreviewLines(
+      viewing.invoice,
+      viewing.company || {},
+      viewing.printer || {}
+    )
   }, [viewing])
 
   const guard = (action) => async (row) => {
@@ -368,7 +368,8 @@ function SavedInvoicesPage({ onEdit }) {
       >
         {viewing && (
           <ReceiptPreview
-            receiptLines={viewingReceipt}
+            receiptLines={viewingReceipt.lines}
+            error={viewingReceipt.error}
             paperWidth={Number(viewing.printer?.paperWidthMm) || 80}
             characterWidth={Number(viewing.printer?.characterWidth) || 48}
             logoDataUrl={viewing.company?.logoDataUrl || ''}

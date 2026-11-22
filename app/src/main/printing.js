@@ -167,7 +167,14 @@ export function receiptLinesToHtml(lines, printer, logoDataUrl = '') {
       const text = escapeHtml(line.text)
       const align = line.align === 'center' ? 'center' : line.align === 'right' ? 'right' : 'left'
       const weight = line.bold ? 700 : 400
-      return `<div style="text-align:${align};font-weight:${weight};white-space:pre-wrap">${text || '&nbsp;'}</div>`
+      const underline = Number(line.underline) === 2 ? 'underline double' : Number(line.underline) ? 'underline' : ''
+      const fontSize = line.font === 'b' ? '0.78em' : ''
+      const widthScale = Math.max(1, Math.min(8, Number(line.widthScale) || 1))
+      const heightScale = Math.max(1, Math.min(8, Number(line.heightScale) || 1))
+      const transform = widthScale !== 1 || heightScale !== 1
+        ? `transform:scale(${widthScale},${heightScale});transform-origin:${align} top;`
+        : ''
+      return `<div style="text-align:${align};font-weight:${weight};${underline ? `text-decoration:${underline};` : ''}${fontSize ? `font-size:${fontSize};` : ''}${transform}white-space:pre-wrap">${text || '&nbsp;'}</div>`
     })
     .join('')
 

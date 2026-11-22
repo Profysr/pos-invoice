@@ -10,9 +10,12 @@ The objective is to modernize the receipt-template, ESC/POS generation, and LAN 
 
 - Phase 1: Dependency and compatibility validation — completed.
 - Phase 2: Declarative receipt template — completed.
-- Phase 3 onward — pending.
+- Phase 3: ESC/POS generation integration — completed.
+- Phase 4: LAN printing integration — completed.
+- Phase 5: Receipt preview integration — completed and validated.
+- Phase 6 onward — pending.
 
-Existing test baseline: 34/34 passing after Phase 2.
+Latest automated test result: 70/70 passing after Phase 5.
 
 ## Execution Strategy
 

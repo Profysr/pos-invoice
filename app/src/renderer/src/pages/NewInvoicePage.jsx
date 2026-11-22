@@ -5,13 +5,13 @@ import { notifications } from '@mantine/notifications'
 import { IconAlertCircle } from '@tabler/icons-react'
 import InvoiceForm from '../invoice/InvoiceForm.jsx'
 import ReceiptPreview from '../invoice/ReceiptPreview.jsx'
+import { buildReceiptPreviewLines } from '../invoice/receipt-preview-lines.js'
 import {
   buildShippingReceiptFields,
   normalizeShippingReceiptDraft,
   parseMoneyToMinorUnits,
   storedShippingReceiptToDraft
 } from '../../../shared/invoice.js'
-import { buildShippingReceiptLines } from '../../../shared/receipt.js'
 import { DEFAULT_SHIPPING_SERVICE } from '../../../shared/shipping-services.js'
 
 function createId() {
@@ -129,14 +129,14 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
     }
   }, [form.values])
 
-  const receiptLines = useMemo(
+  const receiptPreview = useMemo(
     () =>
-      buildShippingReceiptLines({
+      buildReceiptPreviewLines(
         receipt,
-        company: bootstrap.company || {},
-        printer: bootstrap.printer || { characterWidth: 48, paperWidthMm: 80 }
-      }),
-    [receipt, bootstrap]
+        bootstrap.company || {},
+        bootstrap.printer || { characterWidth: 48, paperWidthMm: 80 }
+      ),
+    [receipt, bootstrap.company, bootstrap.printer]
   )
 
   const paperWidth = Number(bootstrap.printer?.paperWidthMm) || 80
@@ -218,7 +218,8 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
       >
         <ScrollArea style={{ width: '100%' }} offsetScrollbars="y">
           <ReceiptPreview
-            receiptLines={receiptLines}
+            receiptLines={receiptPreview.lines}
+            error={receiptPreview.error}
             paperWidth={paperWidth}
             characterWidth={characterWidth}
             logoDataUrl={bootstrap.company?.logoDataUrl || ''}

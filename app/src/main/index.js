@@ -4,9 +4,8 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 import icon from '../../resources/icon.png?asset'
 import { createDatabaseStore, initializeUserData } from './database.js'
-import { buildShippingReceiptLines } from '../shared/receipt.js'
 import { escPosBytes } from './printing.js'
-import { sendBytesLan, sendReceiptLan } from './receipt-printing.js'
+import { buildReceiptPrintLines, sendBytesLan, sendReceiptLan } from './receipt-printing.js'
 import { printSystem } from './system-print.js'
 
 let database
@@ -256,11 +255,6 @@ function registerIpcHandlers() {
     try {
       const company = database.getCompany() || defaultCompany()
       const logoPath = effectiveLogoPath(company)
-      const lines = buildShippingReceiptLines({
-        receipt: saved,
-        company: { ...company, logoPath },
-        printer
-      })
 
       let result
       if (printer.connectionType === 'network') {
@@ -269,6 +263,7 @@ function registerIpcHandlers() {
         // untouched.
         result = await sendReceiptLan(saved, company, printer, { logoPath })
       } else {
+        const lines = buildReceiptPrintLines(saved, { ...company, logoPath }, printer)
         const logoDataUrl = (await withLogoDataUrl(company)).logoDataUrl
         result = await printSystem(lines, printer, logoDataUrl)
       }

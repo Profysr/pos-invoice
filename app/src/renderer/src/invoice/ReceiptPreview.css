@@ -58,6 +58,27 @@
   font-weight: 700;
 }
 
+.receipt-line.underline {
+  text-decoration: underline;
+}
+
+.receipt-line.underline-double {
+  text-decoration: underline double;
+}
+
+.receipt-line.font-b {
+  font-size: 0.78em;
+}
+
 .receipt-line.receipt-gap {
-  height: 0.7em;
+  height: 1.45em;
+}
+
+.receipt-error {
+  width: 100%;
+  padding: 12px;
+  color: var(--mantine-color-red-7);
+  background: var(--mantine-color-red-0);
+  border: 1px solid var(--mantine-color-red-2);
+  border-radius: var(--mantine-radius-sm);
 }
