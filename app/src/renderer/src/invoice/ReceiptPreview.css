@@ -17,7 +17,7 @@
   flex-shrink: 0;
   background: var(--mantine-color-white);
   box-shadow: 0 1px 4px rgba(31, 41, 55, 0.16);
-  padding: 12px 8px;
+  padding: 8px 4px;
   font-family: 'Consolas', 'Courier New', 'DejaVu Sans Mono', monospace;
   font-size: 11px;
   line-height: 1.45;
@@ -31,15 +31,16 @@
 
 .receipt-logo {
   display: block;
-  margin: 0 auto 6px;
-  max-width: 70%;
+  margin: 0 auto 10px;
+  width: 68%;
   height: auto;
 }
 
 .receipt-divider {
   border-bottom: 1px dashed var(--mantine-color-text);
   height: 0;
-  margin: 3px 0;
+  width: 100%;
+  margin: 4px 0;
 }
 
 .receipt-line.align-left {
@@ -52,6 +53,12 @@
 
 .receipt-line.align-right {
   text-align: right;
+}
+
+/* Footer text is the same Consolas size as body, just center-aligned.
+   Blank gap between the two paragraphs. */
+.receipt-line.receipt-footer + .receipt-line.receipt-footer {
+  margin-top: 1.45em;
 }
 
 .receipt-line.bold {

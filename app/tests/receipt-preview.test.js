@@ -41,9 +41,8 @@ test('browser and main-process template renders produce identical operations', (
   )
 })
 
-test('supports 58 mm and 80 mm character grids', () => {
+test('supports 80 mm character grid (58 mm disabled in settings)', () => {
   for (const printer of [
-    { characterWidth: 32, paperWidthMm: 58 },
     { characterWidth: 48, paperWidthMm: 80 }
   ]) {
     const preview = buildReceiptPreviewLines(receipt, company, printer)
@@ -78,6 +77,20 @@ test('preserves alignment, indentation, spacing, tables and bold sections', () =
   assert.ok(lines.some((line) => line.text?.includes('Grand Total:') && line.bold))
   assert.ok(lines.filter((line) => line.text === '').length >= 3)
   assert.ok(lines.some((line) => line.type === 'divider'))
+})
+
+test('footer lines after last divider are marked for larger styling', () => {
+  const preview = buildReceiptPreviewLines(receipt, company, {
+    characterWidth: 42,
+    paperWidthMm: 80
+  })
+  const lines = preview.lines
+  const footerLines = lines.filter((line) => line.footer)
+  assert.ok(footerLines.length > 0, 'footer lines present')
+  assert.ok(footerLines.some((line) => line.text?.includes('28777')), 'first footer paragraph marked')
+  assert.ok(footerLines.some((line) => line.text?.includes('claims.htm')), 'second footer paragraph marked')
+  // All footer lines are centered
+  assert.ok(footerLines.every((line) => line.text === '' || line.align === 'center'), 'footer lines centered')
 })
 
 test('omits optional shipping fields while keeping fixed insurance', () => {

@@ -20,15 +20,16 @@ function padCell(value, width, align) {
  * per-cell styles, which retail-print-kit 0.4.0 ignores for row/table blocks.
  */
 function formatTableHeader(width) {
+  // Column widths tuned to the reference receipt: Product | Qty | Unit Price | Price
   const widths = [
-    Math.floor(width * 0.4),
-    Math.floor(width * 0.12),
-    Math.floor(width * 0.28)
+    Math.floor(width * 0.50),
+    Math.floor(width * 0.10),
+    Math.floor(width * 0.24)
   ]
   widths.push(width - widths.reduce((sum, value) => sum + value, 0))
 
   const headers = ['Product', 'Qty', 'Unit Price', 'Price']
-  const aligns = ['left', 'right', 'right', 'right']
+  const aligns = ['left', 'center', 'right', 'right']
   const wrapped = headers.map((value, index) => wrapText(value, widths[index]))
   const rowCount = Math.max(1, ...wrapped.map((lines) => lines.length))
 
@@ -67,8 +68,11 @@ export const RECEIPT_TEMPLATE = {
     // Blank line before the body.
     { type: 'newline', count: 1 },
 
-    // Date and time.
-    { type: 'text', value: '{{invoiceDate}} {{invoiceTime}}', align: 'left' },
+    // Date and time: date left, time right on one row.
+    { type: 'row', cells: [
+      { value: '{{invoiceDate}}', align: 'LEFT', width: 0.5 },
+      { value: '{{invoiceTime}}', align: 'RIGHT', width: 0.5 },
+    ]},
 
     // Section rule.
     { type: 'line', char: '-' },
@@ -100,13 +104,13 @@ export const RECEIPT_TEMPLATE = {
     // Expected delivery date.
     { type: 'text', value: 'Expected Delivery Date:', align: 'left' },
     { type: 'if', when: 'expectedDeliveryDate', blocks: [
-      { type: 'text', value: '  {{expectedDeliveryDate}}', align: 'left' },
+      { type: 'text', value: '     {{expectedDeliveryDate}}', align: 'left' },
     ]},
 
     // Tracking number.
     { type: 'text', value: 'Tracking #:', align: 'left', style: 'b' },
     { type: 'if', when: 'trackingNumber', blocks: [
-      { type: 'text', value: '  {{trackingNumber}}', align: 'left' },
+      { type: 'text', value: '      {{trackingNumber}}', align: 'left' },
     ]},
 
     // Blank line before totals.
@@ -158,11 +162,7 @@ export function buildReceiptViewModel(receipt, company, printer) {
   const priceFormatted = money(price)
   const totalFormatted = money(total)
 
-  // Multi-item support: use receipt.items when provided, otherwise a single
-  // shipping-service row matching the existing receipt model.
-  // Production receipts carry DB-shaped line items (description / quantityMilli
-  // / unitPrice / lineTotal, money in minor units); map them onto the columns
-  // the template renders.
+  // Multi-item support: use receipt.items when provided, otherwise a single shipping-service row matching the existing receipt model. Production receipts carry DB-shaped line items (description / quantityMilli / unitPrice / lineTotal, money in minor units); map them onto the columns the template renders.
   const items = Array.isArray(receipt.items) && receipt.items.length > 0
     ? receipt.items.map((item) => ({
         product: item.description || '',
@@ -206,8 +206,7 @@ export function buildReceiptViewModel(receipt, company, printer) {
     ...profiles['generic-escpos'],
     paper: Number(printer.paperWidthMm) === 58 ? 58 : 80,
     columns: { a: Number(printer.characterWidth) || 48, b: Number(printer.characterWidth) || 48 },
-    // Preserve existing GS V 65 feed-and-cut behavior instead of the library's
-    // default `legacy` (GS V 0/1).
+    // Preserve existing GS V 65 feed-and-cut behavior instead of the library's default `legacy` (GS V 0/1).
     cut: 'feed-and-cut'
   }
 

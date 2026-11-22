@@ -24,7 +24,8 @@ function normalizeEntry(entry) {
     font: entry?.font === 'b' ? 'b' : 'a',
     widthScale: Math.max(1, Math.min(8, Number(entry?.widthScale) || 1)),
     heightScale: Math.max(1, Math.min(8, Number(entry?.heightScale) || 1)),
-    type: entry?.type ?? 'text'
+    type: entry?.type ?? 'text',
+    footer: Boolean(entry?.footer)
   }
 }
 
@@ -67,7 +68,7 @@ function ReceiptPreview({
           <div className="receipt-line">— receipt preview —</div>
         ) : (
           receiptLines.map((entry, index) => {
-            const { text, align, bold, underline, font, widthScale, heightScale, type } =
+            const { text, align, bold, underline, font, widthScale, heightScale, type, footer } =
               normalizeEntry(entry)
             if (type === 'logo') {
               return logoDataUrl ? (
@@ -85,7 +86,8 @@ function ReceiptPreview({
               `align-${align}`,
               bold ? 'bold' : '',
               underline === 2 ? 'underline-double' : underline ? 'underline' : '',
-              font === 'b' ? 'font-b' : ''
+              font === 'b' ? 'font-b' : '',
+              footer ? 'receipt-footer' : ''
             ]
               .filter(Boolean)
               .join(' ')

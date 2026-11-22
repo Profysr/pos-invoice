@@ -49,6 +49,44 @@ test('renders the full shipping receipt with all sections', () => {
   assert.ok(insuranceIndex >= 0 && insuranceIndex < totalIndex, 'insurance is printed before Total')
 })
 
+test('date and time render on one row: date left, time right', () => {
+  const ops = renderReceiptTemplate(receipt, company, printer)
+  const text = opsText(ops)
+  const dateTimeIndex = text.findIndex((t) => t.includes('Mon 08/10/2026'))
+  assert.ok(dateTimeIndex >= 0, 'date/time row present')
+  const row = text[dateTimeIndex]
+  assert.ok(row.startsWith('Mon 08/10/2026'), 'date starts the row: ' + JSON.stringify(row))
+  assert.ok(row.endsWith('6:06 PM'), 'time ends the row: ' + JSON.stringify(row))
+})
+
+test('table columns align to reference positions', () => {
+  const ops = renderReceiptTemplate(receipt, company, printer)
+  const text = opsText(ops)
+  const header = text.find((t) => t.includes('Product'))
+  assert.ok(header, 'header row present')
+  // Product left-aligned at start, Qty centered, Unit Price and Price right-aligned
+  assert.ok(header.startsWith('Product'), 'Product starts at left edge: ' + JSON.stringify(header))
+  assert.ok(header.includes('Qty'), 'Qty column present')
+  assert.ok(header.includes('Unit Price'), 'Unit Price column present')
+  assert.ok(header.endsWith('Price'), 'Price ends the row: ' + JSON.stringify(header))
+})
+
+test('shipment section indentation matches reference levels', () => {
+  const ops = renderReceiptTemplate(receipt, company, printer)
+  const text = opsText(ops)
+  const dest = text.find((t) => t.includes('DANBURY CT 06810'))
+  assert.ok(dest, 'destination present')
+  assert.ok(dest.startsWith('  DANBURY'), 'destination indented ~2 spaces: ' + JSON.stringify(dest))
+
+  const delivery = text.find((t) => t.includes('Thu 08/13/2026'))
+  assert.ok(delivery, 'delivery date value present')
+  assert.ok(delivery.startsWith('     Thu'), 'delivery value indented further: ' + JSON.stringify(delivery))
+
+  const tracking = text.find((t) => t.includes('9201 9903'))
+  assert.ok(tracking, 'tracking number present')
+  assert.ok(tracking.startsWith('      9201'), 'tracking value indented furthest: ' + JSON.stringify(tracking))
+})
+
 test('encodes to valid ESC/POS bytes for the 80 mm generic profile', () => {
   const ops = renderReceiptTemplate(receipt, company, printer)
   const bytes = encodeEscPos(ops, profiles['generic-escpos'])
