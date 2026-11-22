@@ -129,6 +129,7 @@ export const RECEIPT_TEMPLATE = {
     // Grand total (bold).
     { type: 'text', value: '{{grandTotalRow}}', align: 'left', style: 'b' },
     { type: 'line', char: '-' },
+    { type: 'line', char: '-' },
 
     // Blank line before footer.
     { type: 'newline', count: 1 },
@@ -172,12 +173,17 @@ export function buildReceiptViewModel(receipt, company, printer) {
       }))
     : [{ product, qty: '1', unitPrice: priceFormatted, price: priceFormatted }]
 
+  // Footer wrapping width tuned to match the reference PDF's proportional-font
+  // line breaks. The body/table uses the full printer width; the footer is
+  // narrower so lines break closer to the reference visual.
+  const footerWidth = Math.floor(width * 0.85)
+
   const footerLines = []
   for (const paragraph of [
     'Text your tracking number to 28777 (2USPS) to get the latest status. Standard Message and Date Rates may apply. You may also visit www.usps.com USPS Tracking or call 1-800-222-1811.',
-    'Save this receipt as evidence of insurance. For information on filing an insurance claim go to https://www.usps.com/help/claims.html or call 1-800-222-1811.',
+    'Save this receipt as evidence of insurance. For information on filing an insurance claim go to https://www.usps.com/help/claims.htm or call 1-800-222-1811.',
   ]) {
-    for (const line of wrapText(paragraph, width)) {
+    for (const line of wrapText(paragraph, footerWidth)) {
       footerLines.push(line)
     }
     footerLines.push('')

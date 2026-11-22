@@ -86,9 +86,7 @@ export async function encodeReceipt(receipt, company, printer, options = {}) {
   const [data, profile] = buildReceiptViewModel(receipt, company, printer)
   let ops = render(RECEIPT_TEMPLATE, data, profile)
 
-  // The template `image` block does not interpolate width/height/data, so a
-  // runtime logo is prepended as a raw ESC/POS GS v 0 raster op instead.
-  // rasterizeLogo() reports its size as widthDots/heightDots.
+  // The template `image` block does not interpolate width/height/data, so a runtime logo is prepended as a raw ESC/POS GS v 0 raster op instead. rasterizeLogo() reports its size as widthDots/heightDots.
   if (logoBitmap) {
     ops.unshift({
       kind: 'raster',
@@ -98,20 +96,17 @@ export async function encodeReceipt(receipt, company, printer, options = {}) {
     })
   }
 
-  // ESC @ initialization, matching the existing escPosBytes output and
-  // retail-print-kit's Printer.open() convention. Double init is harmless.
+  // ESC @ initialization, matching the existing escPosBytes output and retail-print-kit's Printer.open() convention. Double init is harmless.
   ops.unshift({ kind: 'init' })
 
-  // Sanitize text operations before encoding so characters printers choke on
-  // (curly quotes, ×, control chars, NBSP) never reach the ESC/POS stream.
+  // Sanitize text operations before encoding so characters printers choke on (curly quotes, ×, control chars, NBSP) never reach the ESC/POS stream.
   for (const op of ops) {
     if (op.kind === 'text') {
       op.text = sanitizeEscPosText(op.text)
     }
   }
 
-  // Automatic paper cut after every LAN receipt, matching the legacy
-  // escPosBytes() terminating cut (GS V 65 feed-and-cut).
+  // Automatic paper cut after every LAN receipt, matching the legacy escPosBytes() terminating cut (GS V 65 feed-and-cut).
   ops.push({ kind: 'cut', partial: false, feed: 3 })
 
   return encodeEscPos(ops, profile)
@@ -129,8 +124,7 @@ export async function encodeReceipt(receipt, company, printer, options = {}) {
  * produced, keeping the invoice:print response text unchanged.
  */
 export async function sendBytesLan(bytes, printer) {
-  // Legacy sendNetwork() rejected a missing host; NetTransport would otherwise
-  // silently fall back to localhost.
+  // Legacy sendNetwork() rejected a missing host; NetTransport would otherwise silently fall back to localhost.
   if (!printer?.networkHost) throw new Error('Network printer host is missing')
 
   const transport = createNetTransport(printer)

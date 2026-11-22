@@ -53,7 +53,7 @@ test('builds structured shipping fields and combines the sender contact', () => 
   })
 
   assert.equal(fields.senderContact, '(800)275-8777')
-  assert.equal(fields.shippingFrom, 'DE MOSS\n5800 Corporate Dr\nHouston\nTX 77036\n(800)275-8777')
+  assert.equal(fields.shippingFrom, 'DE MOSS\n5800 Corporate Dr Houston\nTX 77036\n(800)275-8777')
   assert.equal(fields.destinationAddress, 'DANBURY, CT 06810')
   assert.equal(fields.packageWeight, '14 lb 6.0 oz')
 })
@@ -109,7 +109,7 @@ test('normalizes a shipping receipt draft for persistence', () => {
   assert.equal(invoice.destinationZip, '06810')
   assert.equal(invoice.destinationAddress, 'DANBURY, CT 06810')
   assert.equal(invoice.packageWeight, '14 lb 6.0 oz')
-  assert.equal(invoice.shippingFrom, 'DE MOSS\n5800 Corporate Dr\nHouston\nTX 77036\n(800)275-8777')
+  assert.equal(invoice.shippingFrom, 'DE MOSS\n5800 Corporate Dr Houston\nTX 77036\n(800)275-8777')
   assert.equal(invoice.insurance, 0)
   assert.equal('insuranceLabel' in invoice, false)
   assert.equal('insuranceAmount' in invoice, false)
@@ -195,25 +195,4 @@ test('round-trips a stored receipt back into draft values', () => {
   assert.equal('insuranceAmount' in draft, false)
 })
 
-test('splits legacy receipt fields into structured draft values', () => {
-  const draft = storedShippingReceiptToDraft({
-    shippingFrom: 'DE MOSS\n5800 Corporate Dr\nHouston\nTX 77036\n(800)275-8777',
-    destinationAddress: 'DANBURY CT 06810',
-    packageWeight: '14 lb 6.0 oz'
-  })
 
-  assert.equal(draft.senderName, 'DE MOSS')
-  assert.equal(draft.senderStreet, '5800 Corporate Dr')
-  assert.equal(draft.senderCity, 'Houston')
-  assert.equal(draft.senderState, 'TX')
-  assert.equal(draft.senderZip, '77036')
-  assert.equal(draft.senderContact, '(800)275-8777')
-  assert.equal(draft.senderContactArea, '800')
-  assert.equal(draft.senderContactPrefix, '275')
-  assert.equal(draft.senderContactLine, '8777')
-  assert.equal(draft.destCity, 'DANBURY')
-  assert.equal(draft.destState, 'CT')
-  assert.equal(draft.destZip, '06810')
-  assert.equal(draft.weightLb, '14')
-  assert.equal(draft.weightOz, '6.0')
-})

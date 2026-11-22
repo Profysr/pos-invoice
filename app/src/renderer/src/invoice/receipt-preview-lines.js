@@ -20,8 +20,7 @@ export function buildReceiptPreviewLines(receipt = {}, company = {}, printer = {
       width: profile.columns.a,
       logo: Boolean(company.logoDataUrl)
     })
-    // Footer lines are the centered text lines after the last divider.
-    // Style them larger with more line spacing to match the reference.
+    // Footer lines are the centered text lines after the last divider. Style them larger with more line spacing to match the reference.
     let lastDividerIndex = -1
     for (let i = 0; i < lines.length; i += 1) {
       if (lines[i].type === 'divider') lastDividerIndex = i

@@ -78,7 +78,6 @@ export function buildShippingReceiptFields(values) {
   const destinationZip = optionalText(values?.destZip, 'Destination ZIP')
   const weightLb = optionalText(values?.weightLb, 'Weight pounds')
   const weightOz = optionalText(values?.weightOz, 'Weight ounces')
-  const senderStateZip = [senderState, senderZip].filter(Boolean).join(' ')
   const destinationStateZip = [destinationState, destinationZip].filter(Boolean).join(' ')
 
   return {
@@ -93,9 +92,8 @@ export function buildShippingReceiptFields(values) {
     destinationZip,
     shippingFrom: [
       senderName,
-      senderStreet,
-      senderCity,
-      senderStateZip,
+      [senderStreet, senderCity].filter(Boolean).join(' '),
+      [senderState, senderZip].filter(Boolean).join(' '),
       senderContact
     ]
       .filter(Boolean)
@@ -105,48 +103,6 @@ export function buildShippingReceiptFields(values) {
       .filter(Boolean)
       .join(' ')
   }
-}
-
-function legacySenderFields(value) {
-  const lines = String(value ?? '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-  const fields = {
-    senderName: '',
-    senderStreet: '',
-    senderCity: '',
-    senderState: '',
-    senderZip: '',
-    senderContact: ''
-  }
-  if (!lines.length) return fields
-
-  fields.senderName = lines.shift()
-  if (/^(?:\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})$/.test(lines.at(-1) || '')) {
-    fields.senderContact = lines.pop()
-  }
-
-  const stateZipPattern = /^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/
-  const stateZipIndex = lines.findIndex((line) => stateZipPattern.test(line))
-  if (stateZipIndex !== -1) {
-    const [, state, zip] = lines[stateZipIndex].match(stateZipPattern)
-    fields.senderState = state.toUpperCase()
-    fields.senderZip = zip
-    lines.splice(stateZipIndex, 1)
-  }
-
-  if (lines.length) fields.senderStreet = lines.shift()
-  if (lines.length) fields.senderCity = lines.shift()
-  return fields
-}
-
-function legacyDestinationFields(value) {
-  const match = String(value ?? '')
-    .trim()
-    .match(/^(.+?)[,\s]+([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/)
-  if (!match) return { destCity: '', destState: '', destZip: '' }
-  return { destCity: match[1], destState: match[2].toUpperCase(), destZip: match[3] }
 }
 
 function splitPackageWeight(value) {
@@ -205,12 +161,8 @@ export function normalizeShippingReceiptDraft(values, id) {
 // Convert a stored receipt back into the editable draft values.
 export function storedShippingReceiptToDraft(invoice) {
   if (!invoice) throw new Error('Receipt is missing')
-  const legacySender = legacySenderFields(invoice.shippingFrom)
-  const legacyDestination = legacyDestinationFields(invoice.destinationAddress)
   const weight = splitPackageWeight(invoice.packageWeight)
-  const senderContact =
-    invoice.senderContact || invoice.sender_contact || legacySender.senderContact
-  const contact = splitSenderContact(senderContact)
+  const contact = splitSenderContact(invoice.senderContact || '')
 
   return {
     invoiceNumber: invoice.invoiceNumber,
@@ -219,18 +171,18 @@ export function storedShippingReceiptToDraft(invoice) {
     currency: invoice.currency,
     trackingNumber: invoice.trackingNumber,
     price: ((Number(invoice.subtotal) || 0) / 100).toFixed(2),
-    senderName: invoice.senderName || invoice.sender_name || legacySender.senderName,
-    senderStreet: invoice.senderStreet || invoice.sender_street || legacySender.senderStreet,
-    senderCity: invoice.senderCity || invoice.sender_city || legacySender.senderCity,
-    senderState: invoice.senderState || invoice.sender_state || legacySender.senderState,
-    senderZip: invoice.senderZip || invoice.sender_zip || legacySender.senderZip,
-    senderContact,
+    senderName: invoice.senderName || '',
+    senderStreet: invoice.senderStreet || '',
+    senderCity: invoice.senderCity || '',
+    senderState: invoice.senderState || '',
+    senderZip: invoice.senderZip || '',
+    senderContact: invoice.senderContact || '',
     ...contact,
     expectedDeliveryDate: invoice.expectedDeliveryDate || '',
     service: invoice.shippingService || '',
-    destCity: invoice.destinationCity || invoice.destination_city || legacyDestination.destCity,
-    destState: invoice.destinationState || invoice.destination_state || legacyDestination.destState,
-    destZip: invoice.destinationZip || invoice.destination_zip || legacyDestination.destZip,
+    destCity: invoice.destinationCity || '',
+    destState: invoice.destinationState || '',
+    destZip: invoice.destinationZip || '',
     weightLb: weight.weightLb,
     weightOz: weight.weightOz
   }

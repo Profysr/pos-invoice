@@ -1,5 +1,4 @@
 /* Thermal receipt preview — dedicated physical-paper styling. */
-
 .receipt-preview-area {
   display: flex;
   justify-content: center;
@@ -55,8 +54,10 @@
   text-align: right;
 }
 
-/* Footer text is the same Consolas size as body, just center-aligned.
-   Blank gap between the two paragraphs. */
+/* Footer text: larger than body, centered, with letter spacing and line
+   height tuned to match the reference PDF's proportional-font footer. */
+
+/* Noticeable blank space between the two footer paragraphs. */
 .receipt-line.receipt-footer + .receipt-line.receipt-footer {
   margin-top: 1.45em;
 }
