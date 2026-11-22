@@ -136,8 +136,7 @@ function PrinterSettingsSection({
             color="accent"
             autoContrast
             data={[
-              { value: '80', label: '80 mm (48 chars/line)' },
-              { value: '58', label: '58 mm (32 chars/line)' }
+              { value: '80', label: '80 mm (48 chars/line)' }
             ]}
             key={form.key('paperWidthMm')}
             {...form.getInputProps('paperWidthMm')}
