@@ -293,7 +293,7 @@ function InvoiceForm({ form, title = 'New receipt', onPrint, printing = false })
                   {...form.getInputProps('destZip')}
                 />
               </Flex>
-              <Fieldset legend="Package weight" variant="unstyled">
+              <Fieldset legend="Package weight" variant="default">
                 <Group gap="xs" wrap="wrap">
                   <TextInput
                     label="Weight (lb)"

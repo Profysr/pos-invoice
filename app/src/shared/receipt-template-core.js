@@ -1,7 +1,7 @@
 import { formatMoney } from './invoice.js'
 import { formatReceiptDate, formatReceiptTime, groupTrackingNumber } from './dates.js'
 import { wrapText } from './receipt.js'
-import { profiles } from 'retail-print-kit'
+import { profiles } from 'retail-print-kit/browser'
 
 function padCell(value, width, align) {
   const text = String(value ?? '').slice(0, width)
