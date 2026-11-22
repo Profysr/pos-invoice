@@ -1,7 +1,13 @@
 import { BrowserWindow } from 'electron'
-import { receiptLinesToHtml } from './printing.js'
 
-export async function printSystem(lines, printer, logoDataUrl = '', options = {}) {
+/**
+ * Print an already-rendered HTML receipt to a Windows system printer.
+ *
+ * @param {string} html - complete HTML document string
+ * @param {object} printer - printer profile (systemPrinterName used for device)
+ * @param {object} options - { silent?: boolean }
+ */
+export async function printSystem(html, printer, options = {}) {
   // silent: true skips the Windows print dialog (used by the Test button).
   const { silent = false } = options
   const owner =
@@ -12,7 +18,6 @@ export async function printSystem(lines, printer, logoDataUrl = '', options = {}
   })
 
   try {
-    const html = receiptLinesToHtml(lines, printer, logoDataUrl)
     await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
     return await new Promise((resolve, reject) => {
       window.webContents.print(

@@ -7,10 +7,8 @@ import {
   buildReceiptViewModel
 } from '../src/shared/receipt-template-core.js'
 import {
-  buildReceiptPrintLines,
   encodeReceipt
 } from '../src/main/receipt-printing.js'
-import { receiptLinesToHtml } from '../src/main/printing.js'
 import { buildReceiptPreviewLines } from '../src/renderer/src/invoice/receipt-preview-lines.js'
 
 const receipt = {
@@ -41,15 +39,6 @@ test('browser and main-process template renders produce identical operations', (
     renderBrowser(RECEIPT_TEMPLATE, data, profile),
     renderNode(RECEIPT_TEMPLATE, data, profile)
   )
-})
-
-test('preview and Windows print use the same canonical receipt lines', () => {
-  const printer = { characterWidth: 42, paperWidthMm: 80 }
-  const preview = buildReceiptPreviewLines(receipt, company, printer)
-  const printLines = buildReceiptPrintLines(receipt, company, printer)
-
-  assert.equal(preview.error, '')
-  assert.deepEqual(preview.lines, printLines)
 })
 
 test('supports 58 mm and 80 mm character grids', () => {
@@ -192,19 +181,4 @@ test('surfaces preview errors instead of falling back to another receipt layout'
 
   assert.deepEqual(preview.lines, [])
   assert.match(preview.error, /Receipt data is unavailable/)
-})
-
-test('Windows HTML preserves the canonical alignment and text styles', () => {
-  const printer = { characterWidth: 42, paperWidthMm: 80 }
-  const html = receiptLinesToHtml(
-    [
-      { text: 'CENTER', align: 'center', bold: true, underline: 2 },
-      { text: 'PLAIN', align: 'left' }
-    ],
-    printer
-  )
-
-  assert.match(html, /text-align:center/)
-  assert.match(html, /font-weight:700/)
-  assert.match(html, /text-decoration:underline double/)
 })

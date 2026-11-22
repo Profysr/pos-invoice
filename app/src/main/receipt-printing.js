@@ -1,6 +1,25 @@
-import { encodeEscPos, NetTransport, render } from 'retail-print-kit'
+import { encodeEscPos, NetTransport, opsToHtml, render } from 'retail-print-kit'
 import { RECEIPT_TEMPLATE, buildReceiptViewModel } from '../shared/receipt-template-core.js'
-import { opsToReceiptLines } from '../shared/receipt-ops-lines.js'
+
+/**
+ * Sanitize text for ESC/POS output. Strips characters thermal printers choke on
+ * (non-breaking spaces, curly quotes, control characters) so they never reach
+ * the printer stream.
+ */
+export function sanitizeEscPosText(value) {
+  return String(value ?? '')
+    .replace(/[\u00a0\u202f]/g, ' ')
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
+    .replace(/[×]/g, 'x')
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .split('')
+    .filter((character) => {
+      const code = character.charCodeAt(0)
+      return code >= 32 && code !== 127
+    })
+    .join('')
+}
 
 /**
  * Lazily rasterize a company logo using the existing Electron `nativeImage`
@@ -29,19 +48,6 @@ export async function rasterizeReceiptLogo(logoPath, { widthDots = 400 } = {}) {
  */
 export function logoWidthDots(printer) {
   return Math.round(((Number(printer.printableWidthMm) || 72) * (Number(printer.dotDensity) || 8)) * 0.7)
-}
-
-/**
- * Build canonical receipt lines for the Windows system-print path.
- * The template and operations are shared with LAN printing and the preview.
- */
-export function buildReceiptPrintLines(receipt, company = {}, printer = {}) {
-  const [data, profile] = buildReceiptViewModel(receipt, company, printer)
-  const ops = render(RECEIPT_TEMPLATE, data, profile)
-  return opsToReceiptLines(ops, {
-    width: profile.columns.a,
-    logo: Boolean(company.logoPath || company.logoDataUrl)
-  })
 }
 
 /**
@@ -96,6 +102,18 @@ export async function encodeReceipt(receipt, company, printer, options = {}) {
   // retail-print-kit's Printer.open() convention. Double init is harmless.
   ops.unshift({ kind: 'init' })
 
+  // Sanitize text operations before encoding so characters printers choke on
+  // (curly quotes, ×, control chars, NBSP) never reach the ESC/POS stream.
+  for (const op of ops) {
+    if (op.kind === 'text') {
+      op.text = sanitizeEscPosText(op.text)
+    }
+  }
+
+  // Automatic paper cut after every LAN receipt, matching the legacy
+  // escPosBytes() terminating cut (GS V 65 feed-and-cut).
+  ops.push({ kind: 'cut', partial: false, feed: 3 })
+
   return encodeEscPos(ops, profile)
 }
 
@@ -136,6 +154,31 @@ export async function sendBytesLan(bytes, printer) {
 export async function sendReceiptLan(receipt, company, printer, options = {}) {
   const bytes = await encodeReceipt(receipt, company, printer, options)
   return sendBytesLan(bytes, printer)
+}
+
+/**
+ * Render an HTML receipt for Windows system printing using retail-print-kit's
+ * opsToHtml. The company logo is rasterized and prepended as a raster op so it
+ * flows through the same pipeline as LAN ESC/POS output.
+ */
+export async function buildReceiptPrintHtml(receipt, company, printer, options = {}) {
+  const { logoPath, rasterizeLogo = defaultRasterizeLogo } = options
+  const [data, profile] = buildReceiptViewModel(receipt, company, printer)
+  let ops = render(RECEIPT_TEMPLATE, data, profile)
+
+  if (logoPath) {
+    const logoBitmap = await rasterizeLogo(logoPath, { widthDots: logoWidthDots(printer) })
+    if (logoBitmap) {
+      ops.unshift({
+        kind: 'raster',
+        width: logoBitmap.widthDots,
+        height: logoBitmap.heightDots,
+        bits: new Uint8Array(logoBitmap.data)
+      })
+    }
+  }
+
+  return opsToHtml(ops, profile)
 }
 
 export { buildReceiptViewModel }

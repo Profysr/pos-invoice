@@ -1,6 +1,7 @@
 import { formatMoney } from './invoice.js'
 import { formatReceiptDate, formatReceiptTime, groupTrackingNumber } from './dates.js'
 import { wrapText } from './receipt.js'
+import { profiles } from 'retail-print-kit'
 
 function padCell(value, width, align) {
   const text = String(value ?? '').slice(0, width)
@@ -202,18 +203,12 @@ export function buildReceiptViewModel(receipt, company, printer) {
   }
 
   const profile = {
-    id: 'generic-escpos',
-    vendor: 'Generic',
-    model: 'ESC/POS compatible 80 mm',
-    set: 'escpos',
+    ...profiles['generic-escpos'],
     paper: Number(printer.paperWidthMm) === 58 ? 58 : 80,
-    dots: 576,
     columns: { a: Number(printer.characterWidth) || 48, b: Number(printer.characterWidth) || 48 },
-    encoding: 'cp437',
-    codepage: 0,
-    cut: 'feed-and-cut',
-    drawer: { on: 60, off: 120 },
-    features: { nativeQr: true, raster: true, italic: false, invert: true, beep: true },
+    // Preserve existing GS V 65 feed-and-cut behavior instead of the library's
+    // default `legacy` (GS V 0/1).
+    cut: 'feed-and-cut'
   }
 
   return [data, profile]

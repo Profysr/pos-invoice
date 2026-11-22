@@ -4,8 +4,7 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 import icon from '../../resources/icon.png?asset'
 import { createDatabaseStore, initializeUserData } from './database.js'
-import { escPosBytes } from './printing.js'
-import { buildReceiptPrintLines, sendBytesLan, sendReceiptLan } from './receipt-printing.js'
+import { buildReceiptPrintHtml, sendBytesLan, sendReceiptLan, encodeReceipt } from './receipt-printing.js'
 import { printSystem } from './system-print.js'
 
 let database
@@ -198,12 +197,25 @@ function registerIpcHandlers() {
     ]
 
     try {
+      const company = database.getCompany() || defaultCompany()
+      const logoPath = effectiveLogoPath(company)
+
       if (profile.connectionType === 'network') {
-        const bytes = escPosBytes(lines, profile.characterWidth, {
-          cut: profile.cutAfterPrint,
-          feed: profile.feedLinesAfterPrint,
-          encoding: profile.encoding
-        })
+        // Build a minimal receipt so encodeReceipt produces the test page
+        // through the same retail-print-kit pipeline as real receipts.
+        const testReceipt = {
+          subtotal: 0,
+          shippingFrom: 'PRINTER TEST',
+          invoiceDate: '',
+          invoiceTime: '',
+          shippingService: `${profile.paperWidthMm} mm paper, ${profile.characterWidth} characters per line`,
+          destinationAddress: '',
+          packageWeight: '',
+          expectedDeliveryDate: '',
+          trackingNumber: '',
+          currency: 'USD'
+        }
+        const bytes = await encodeReceipt(testReceipt, company, printer, { logoPath })
         const result = await sendBytesLan(bytes, profile)
         return {
           ok: true,
@@ -212,7 +224,24 @@ function registerIpcHandlers() {
       }
 
       if (!profile.systemPrinterName) throw new Error('Choose an installed printer first')
-      await printSystem(lines, profile, '', { silent: true })
+      const html = await buildReceiptPrintHtml(
+        {
+          subtotal: 0,
+          shippingFrom: 'PRINTER TEST',
+          invoiceDate: '',
+          invoiceTime: '',
+          shippingService: `${profile.paperWidthMm} mm paper, ${profile.characterWidth} characters per line`,
+          destinationAddress: '',
+          packageWeight: '',
+          expectedDeliveryDate: '',
+          trackingNumber: '',
+          currency: 'USD'
+        },
+        company,
+        printer,
+        { logoPath }
+      )
+      await printSystem(html, printer, { silent: true })
       return { ok: true, message: `Test job sent to "${profile.systemPrinterName}".` }
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
@@ -263,9 +292,8 @@ function registerIpcHandlers() {
         // untouched.
         result = await sendReceiptLan(saved, company, printer, { logoPath })
       } else {
-        const lines = buildReceiptPrintLines(saved, { ...company, logoPath }, printer)
-        const logoDataUrl = (await withLogoDataUrl(company)).logoDataUrl
-        result = await printSystem(lines, printer, logoDataUrl)
+        const html = await buildReceiptPrintHtml(saved, company, printer, { logoPath })
+        result = await printSystem(html, printer)
       }
 
       database.recordPrintResult({

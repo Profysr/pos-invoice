@@ -14,7 +14,6 @@ import {
   sendBytesLan,
   sendReceiptLan
 } from '../src/main/receipt-printing.js'
-import { escPosBytes } from '../src/main/printing.js'
 
 const receipt = {
   invoiceDate: '2026-08-10',
@@ -206,34 +205,6 @@ test('rasterizeReceiptLogo returns null when there is no logo path', async () =>
 test('logoWidthDots mirrors the existing print path (70% of printable dots)', () => {
   assert.equal(logoWidthDots({ printableWidthMm: 72, dotDensity: 8 }), Math.round(72 * 8 * 0.7))
   assert.equal(logoWidthDots({ printableWidthMm: 50, dotDensity: 8 }), Math.round(50 * 8 * 0.7))
-})
-
-test('new ESC/POS output matches the existing encoder on structural features', async () => {
-  const oldBytes = escPosBytes(
-    [{ text: 'Hello', align: 'center', bold: true }],
-    48,
-    { cut: true, feed: 1, encoding: 'CP437' }
-  )
-  const newBytes = encodeEscPos(
-    [
-      { kind: 'init' },
-      { kind: 'align', align: 'center' },
-      { kind: 'style', style: { bold: true } },
-      { kind: 'text', text: 'Hello\n' },
-      { kind: 'feed', lines: 1 },
-      { kind: 'cut', partial: false, feed: 3 }
-    ],
-    profile
-  )
-  assert.ok(Buffer.isBuffer(oldBytes) && Buffer.isBuffer(newBytes))
-  assert.ok(oldBytes.length > 0 && newBytes.length > 0)
-  assert.equal(oldBytes[0], 0x1b)
-  assert.equal(oldBytes[1], 0x40)
-  assert.equal(newBytes[0], 0x1b)
-  assert.equal(newBytes[1], 0x40)
-  // Both encoders emit a terminating cut block.
-  assert.ok(oldBytes.includes(0x1d) && oldBytes.includes(0x56))
-  assert.ok(newBytes.includes(0x1d) && newBytes.includes(0x56))
 })
 
 // --- Phase 4: LAN transport ---------------------------------------------
