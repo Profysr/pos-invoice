@@ -21,6 +21,50 @@ export function sanitizeEscPosText(value) {
     .join('')
 }
 
+function boldItemNamesInOps(ops, items) {
+  const result = [...ops]
+  let searchFrom = 0
+  for (const item of items) {
+    const product = String(item?.product ?? '')
+    if (!product) continue
+    const markedProduct = `${product}@`
+    const index = result.findIndex(
+      (op, opIndex) =>
+        opIndex >= searchFrom && op.kind === 'text' && op.text.includes(markedProduct)
+    )
+    if (index < 0) continue
+    const remainder = result[index].text.slice(markedProduct.length)
+    result.splice(
+      index,
+      1,
+      { kind: 'style', style: { bold: true, underline: 0 } },
+      { kind: 'text', text: product },
+      { kind: 'style', style: { bold: false, underline: 0 } },
+      { kind: 'text', text: remainder }
+    )
+    searchFrom = index + 4
+  }
+  return result
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '\u0026amp;')
+    .replace(/</g, '\u003clt;')
+    .replace(/>/g, '\u003egt;')
+}
+
+function boldItemNamesInHtml(html, items) {
+  let result = html
+  for (const item of items) {
+    const product = String(item?.product ?? '')
+    if (!product) continue
+    const escaped = escapeHtml(product)
+    result = result.replace(`>${escaped}@`, `><b>${escaped}</b>`)
+  }
+  return result
+}
+
 /**
  * Lazily rasterize a company logo using the existing Electron `nativeImage`
  * implementation in src/main/logo-raster.js (main process only).
@@ -84,7 +128,7 @@ export async function encodeReceipt(receipt, company, printer, options = {}) {
   }
 
   const [data, profile] = buildReceiptViewModel(receipt, company, printer)
-  let ops = render(RECEIPT_TEMPLATE, data, profile)
+  let ops = boldItemNamesInOps(render(RECEIPT_TEMPLATE, data, profile), data.items)
 
   // The template `image` block does not interpolate width/height/data, so a runtime logo is prepended as a raw ESC/POS GS v 0 raster op instead. rasterizeLogo() reports its size as widthDots/heightDots.
   if (logoBitmap) {
@@ -172,7 +216,7 @@ export async function buildReceiptPrintHtml(receipt, company, printer, options =
     }
   }
 
-  return opsToHtml(ops, profile)
+  return boldItemNamesInHtml(opsToHtml(ops, profile), data.items)
 }
 
 export { buildReceiptViewModel }

@@ -22,14 +22,14 @@ function padCell(value, width, align) {
 function formatTableHeader(width) {
   // Column widths tuned to the reference receipt: Product | Qty | Unit Price | Price
   const widths = [
-    Math.floor(width * 0.50),
-    Math.floor(width * 0.10),
-    Math.floor(width * 0.24)
+    Math.floor(width * 0.46),
+    Math.floor(width * 0.12),
+    Math.floor(width * 0.18)
   ]
   widths.push(width - widths.reduce((sum, value) => sum + value, 0))
 
   const headers = ['Product', 'Qty', 'Unit Price', 'Price']
-  const aligns = ['left', 'center', 'right', 'right']
+  const aligns = ['left', 'right', 'right', 'right']
   const wrapped = headers.map((value, index) => wrapText(value, widths[index]))
   const rowCount = Math.max(1, ...wrapped.map((lines) => lines.length))
 
@@ -43,8 +43,11 @@ function formatTableHeader(width) {
 
 /** Format a label/value row on the printer's character grid. */
 function formatRow(left, right, width) {
-  const leftWidth = Math.floor(width * 0.8)
-  const rightWidth = Math.max(1, width - leftWidth)
+  const rightWidth = Math.min(
+    width,
+    Math.max(String(right).length, Math.ceil(width * 0.2))
+  )
+  const leftWidth = width - rightWidth
   return padCell(left, leftWidth, 'left') + padCell(right, rightWidth, 'right')
 }
 
@@ -61,66 +64,83 @@ export const RECEIPT_TEMPLATE = {
   kind: 'receipt',
   blocks: [
     // Shipping-from address, centered.
-    { type: 'each', items: 'shippingFromLines', blocks: [
-      { type: 'text', value: '{{this}}', align: 'center' },
-    ]},
+    {
+      type: 'each',
+      items: 'shippingFromLines',
+      blocks: [{ type: 'text', value: '{{this}}', align: 'center' }]
+    },
 
     // Blank line before the body.
     { type: 'newline', count: 1 },
 
     // Date and time: date left, time right on one row.
-    { type: 'row', cells: [
-      { value: '{{invoiceDate}}', align: 'LEFT', width: 0.5 },
-      { value: '{{invoiceTime}}', align: 'RIGHT', width: 0.5 },
-    ]},
+    {
+      type: 'row',
+      cells: [
+        { value: '{{invoiceDate}}', align: 'LEFT', width: 0.5 },
+        { value: '{{invoiceTime}}', align: 'RIGHT', width: 0.5 }
+      ]
+    },
 
     // Section rule.
     { type: 'line', char: '-' },
 
     // Table heading. It is a text block so the whole heading can be bold.
     { type: 'text', value: '{{tableHeader}}', style: 'b' },
+    { type: 'line', char: '-' },
 
     // Product rows.
-    { type: 'table', rows: 'items', header: false, columns: [
-      { value: '{{product}}', width: 0.4, align: 'LEFT' },
-      { value: '{{qty}}', width: 0.12, align: 'RIGHT' },
-      { value: '{{unitPrice}}', width: 0.28, align: 'RIGHT' },
-      { value: '{{price}}', width: 0.2, align: 'RIGHT' },
-    ]},
+    {
+      type: 'table',
+      rows: 'items',
+      header: false,
+      columns: [
+        { value: '{{product}}@', width: 0.46, align: 'LEFT' },
+        { value: '{{qty}}', width: 0.12, align: 'RIGHT' },
+        { value: '{{unitPrice}}', width: 0.18, align: 'RIGHT' },
+        { value: '{{price}}', width: 0.24, align: 'RIGHT' }
+      ]
+    },
 
     // Blank line before delivery details.
-    { type: 'newline', count: 1 },
+    // { type: 'newline', count: 1 },
 
     // Destination address.
-    { type: 'if', when: 'destinationAddress', blocks: [
-      { type: 'text', value: '  {{destinationAddress}}', align: 'left' },
-    ]},
+    {
+      type: 'if',
+      when: 'destinationAddress',
+      blocks: [{ type: 'text', value: '  {{destinationAddress}}', align: 'left' }]
+    },
 
     // Package weight.
-    { type: 'if', when: 'packageWeight', blocks: [
-      { type: 'text', value: '  Weight: {{packageWeight}}', align: 'left' },
-    ]},
+    {
+      type: 'if',
+      when: 'packageWeight',
+      blocks: [{ type: 'text', value: '  Weight: {{packageWeight}}', align: 'left' }]
+    },
 
     // Expected delivery date.
     { type: 'text', value: 'Expected Delivery Date:', align: 'left' },
-    { type: 'if', when: 'expectedDeliveryDate', blocks: [
-      { type: 'text', value: '     {{expectedDeliveryDate}}', align: 'left' },
-    ]},
+    {
+      type: 'if',
+      when: 'expectedDeliveryDate',
+      blocks: [{ type: 'text', value: '     {{expectedDeliveryDate}}', align: 'left' }]
+    },
 
     // Tracking number.
     { type: 'text', value: 'Tracking #:', align: 'left', style: 'b' },
-    { type: 'if', when: 'trackingNumber', blocks: [
-      { type: 'text', value: '      {{trackingNumber}}', align: 'left' },
-    ]},
+    {
+      type: 'if',
+      when: 'trackingNumber',
+      blocks: [{ type: 'text', value: '     {{trackingNumber}}', align: 'left' }]
+    },
 
     // Blank line before totals.
     { type: 'newline', count: 1 },
 
-    // Fixed insurance line.
-    { type: 'row', cells: [
-      { value: 'Up to $100.00 included', align: 'LEFT', width: 0.8 },
-      { value: '$0.00', align: 'RIGHT', width: 0.2 },
-    ]},
+    // Fixed insurance line. Preformatting preserves the left padding that
+    // retail-print-kit's row renderer would otherwise trim.
+    { type: 'text', value: '{{insuranceRow}}', align: 'left' },
 
     // Total.
     { type: 'text', value: '{{totalRow}}', align: 'left' },
@@ -135,10 +155,12 @@ export const RECEIPT_TEMPLATE = {
     { type: 'newline', count: 1 },
 
     // Footer paragraphs (centered, wrapped).
-    { type: 'each', items: 'footerLines', blocks: [
-      { type: 'text', value: '{{this}}', align: 'center' },
-    ]},
-  ],
+    {
+      type: 'each',
+      items: 'footerLines',
+      blocks: [{ type: 'text', value: '{{this}}', align: 'center' }]
+    }
+  ]
 }
 
 /**
@@ -168,20 +190,18 @@ export function buildReceiptViewModel(receipt, company, printer) {
     ? receipt.items.map((item) => ({
         product: item.description || '',
         qty: String(Number((Number(item.quantityMilli) / 1000).toFixed(3))),
-        unitPrice: money(item.unitPrice),
+        unitPrice: '',
         price: money(item.lineTotal)
       }))
-    : [{ product, qty: '1', unitPrice: priceFormatted, price: priceFormatted }]
+    : [{ product, qty: '1', unitPrice: '', price: priceFormatted }]
 
-  // Footer wrapping width tuned to match the reference PDF's proportional-font
-  // line breaks. The body/table uses the full printer width; the footer is
-  // narrower so lines break closer to the reference visual.
+  // Keep the footer at 85% of the printable page width.
   const footerWidth = Math.floor(width * 0.85)
 
   const footerLines = []
   for (const paragraph of [
-    'Text your tracking number to 28777 (2USPS) to get the latest status. Standard Message and Date Rates may apply. You may also visit www.usps.com USPS Tracking or call 1-800-222-1811.',
-    'Save this receipt as evidence of insurance. For information on filing an insurance claim go to https://www.usps.com/help/claims.htm or call 1-800-222-1811.',
+    'Text your tracking number to 28777 (2USPS) to get the latest status.Standard Message and Date Rates may apply.You may also visit www.usps.com USPS Tracking or call 1-800-222-1811.',
+    'Save this receipt as evidence of insurance. For information on filing an insurance claim go to https://www.usps.com/help/claims.htm\nor call 1-800-222-1811.',
   ]) {
     for (const line of wrapText(paragraph, footerWidth)) {
       footerLines.push(line)
@@ -201,6 +221,7 @@ export function buildReceiptViewModel(receipt, company, printer) {
     trackingNumber: groupTrackingNumber(receipt.trackingNumber),
     totalLabel: 'Total',
     total: totalFormatted,
+    insuranceRow: formatRow('  Up to $100.00 included', '$0.00', width),
     totalRow: formatRow('Total', totalFormatted, width),
     grandTotalLabel: 'Grand Total:',
     grandTotal: totalFormatted,

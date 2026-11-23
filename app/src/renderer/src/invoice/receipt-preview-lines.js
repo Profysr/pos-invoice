@@ -20,6 +20,24 @@ export function buildReceiptPreviewLines(receipt = {}, company = {}, printer = {
       width: profile.columns.a,
       logo: Boolean(company.logoDataUrl)
     })
+
+    const tableHeaderLines = new Set(String(data.tableHeader).split('\n'))
+    let itemStart = 0
+    for (const item of data.items) {
+      if (!item.product) continue
+      const markedProduct = `${item.product}@`
+      const itemIndex = lines.findIndex(
+        (line, index) => index >= itemStart && line.text?.includes(markedProduct)
+      )
+      if (itemIndex < 0) continue
+      lines[itemIndex].text = lines[itemIndex].text.replace(markedProduct, item.product)
+      lines[itemIndex].boldPrefix = item.product
+      itemStart = itemIndex + 1
+    }
+    for (const line of lines) {
+      if (tableHeaderLines.has(line.text)) line.tableHeader = true
+    }
+
     // Footer lines are the centered text lines after the last divider. Style them larger with more line spacing to match the reference.
     let lastDividerIndex = -1
     for (let i = 0; i < lines.length; i += 1) {

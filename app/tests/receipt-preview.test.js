@@ -72,9 +72,20 @@ test('preserves alignment, indentation, spacing, tables and bold sections', () =
   assert.equal(lines.find((line) => line.text === 'Tracking #:')?.bold, true)
   assert.equal(lines.find((line) => line.text?.startsWith('  DANBURY'))?.text, '  DANBURY CT 06810')
   assert.equal(lines.find((line) => line.text?.startsWith('  Weight:'))?.text, '  Weight: 14 lb 6.0 oz')
-  assert.ok(lines.some((line) => line.text?.includes('Product') && line.bold))
-  assert.ok(lines.some((line) => line.text?.includes('Prepaid Mail')))
-  assert.ok(lines.some((line) => line.text?.includes('Grand Total:') && line.bold))
+  const headerIndex = lines.findIndex((line) => line.text?.includes('Product') && line.bold)
+  const productIndex = lines.findIndex((line) => line.text?.includes('Prepaid Mail'))
+  assert.ok(headerIndex >= 0 && productIndex >= 0)
+  assert.equal(lines[headerIndex - 1]?.type, 'divider', 'table has a top border')
+  assert.equal(lines[productIndex - 1]?.type, 'divider', 'table has a bottom border')
+  assert.equal(lines.filter((line) => line.tableHeader).length, 2, 'table header lines are marked')
+  assert.equal(lines[productIndex].boldPrefix, 'Prepaid Mail', 'service type is marked for bolding')
+  assert.ok(!lines[productIndex].text.includes('@'), 'internal service marker is removed')
+  const grandTotalIndex = lines.findIndex((line) => line.text?.includes('Grand Total:'))
+  assert.ok(grandTotalIndex >= 0)
+  assert.equal(
+    lines.slice(grandTotalIndex + 1).filter((line) => line.type === 'divider').length,
+    2
+  )
   assert.ok(lines.filter((line) => line.text === '').length >= 3)
   assert.ok(lines.some((line) => line.type === 'divider'))
 })
@@ -86,11 +97,32 @@ test('footer lines after last divider are marked for larger styling', () => {
   })
   const lines = preview.lines
   const footerLines = lines.filter((line) => line.footer)
-  assert.ok(footerLines.length > 0, 'footer lines present')
-  assert.ok(footerLines.some((line) => line.text?.includes('28777')), 'first footer paragraph marked')
-  assert.ok(footerLines.some((line) => line.text?.includes('claims.htm')), 'second footer paragraph marked')
-  // All footer lines are centered
+  assert.deepEqual(
+    footerLines.map((line) => line.text),
+    [
+      '',
+      'Text your tracking number to 28777',
+      '(2USPS) to get the latest',
+      'status.Standard Message and Date',
+      'Rates may apply.You may also visit',
+      'www.usps.com USPS Tracking or call',
+      '1-800-222-1811.',
+      '',
+      'Save this receipt as evidence of',
+      'insurance. For information on',
+      'filing an insurance claim go to',
+      'https://www.usps.com/help/claims.ht',
+      'm',
+      'or call 1-800-222-1811.',
+      ''
+    ]
+  )
+  // All footer lines are centered and fit within 85% of the printer grid.
   assert.ok(footerLines.every((line) => line.text === '' || line.align === 'center'), 'footer lines centered')
+  assert.ok(
+    footerLines.every((line) => line.text.length <= Math.floor(42 * 0.85)),
+    'footer lines fit within 85% of the printer width'
+  )
 })
 
 test('omits optional shipping fields while keeping fixed insurance', () => {
@@ -107,7 +139,8 @@ test('omits optional shipping fields while keeping fixed insurance', () => {
 
   assert.doesNotMatch(text, /Weight:/)
   assert.doesNotMatch(text, /DANBURY/)
-  assert.match(text, /Up to \$100\.00 included\s+\$0\.00/)
+  const insurance = preview.lines.find((line) => line.text?.includes('Up to $100.00 included'))
+  assert.match(insurance?.text ?? '', /^  Up to \$100\.00 included\s+\$0\.00/)
 })
 
 test('wraps long product descriptions to the printer width', () => {
@@ -155,9 +188,15 @@ test('every visible preview line is present in the encoded ESC/POS payload', asy
       ? line.character.repeat(printer.characterWidth)
       : line.text
     if (!expected) continue
-    const index = payload.indexOf(expected, cursor)
-    assert.ok(index >= 0, `encoded payload is missing ${JSON.stringify(expected)}`)
-    cursor = index + expected.length
+    const parts = line.boldPrefix
+      ? [line.boldPrefix, line.text.slice(line.boldPrefix.length)]
+      : [expected]
+    for (const part of parts) {
+      if (!part) continue
+      const index = payload.indexOf(part, cursor)
+      assert.ok(index >= 0, `encoded payload is missing ${JSON.stringify(part)}`)
+      cursor = index + part.length
+    }
   }
 })
 

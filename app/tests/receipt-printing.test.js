@@ -8,6 +8,7 @@ import {
 } from 'retail-print-kit'
 import {
   encodeReceipt,
+  buildReceiptPrintHtml,
   createNetTransport,
   rasterizeReceiptLogo,
   logoWidthDots,
@@ -54,6 +55,34 @@ test('encodeReceipt generates ESC/POS bytes without a logo', async () => {
   assert.ok(latin.includes('$0.00'), 'fixed insurance amount present')
   assert.ok(latin.includes('$65.22'), 'total present')
   assert.ok(latin.includes('Text your tracking number to 28777'), 'footer present')
+})
+
+test('encodeReceipt bolds only the service type', async () => {
+  const bytes = await encodeReceipt(receipt, company, printer)
+  const service = Buffer.from('Prepaid Mail')
+  const serviceIndex = bytes.indexOf(service)
+
+  assert.ok(serviceIndex >= 0, 'service type present')
+  assert.ok(
+    bytes.subarray(Math.max(0, serviceIndex - 16), serviceIndex).includes(
+      Buffer.from([0x1b, 0x45, 0x01])
+    ),
+    'bold is enabled before the service type'
+  )
+  assert.ok(
+    bytes.subarray(serviceIndex + service.length, serviceIndex + service.length + 16).includes(
+      Buffer.from([0x1b, 0x45, 0x00])
+    ),
+    'bold is disabled after the service type'
+  )
+  assert.ok(!bytes.toString('latin1').includes('Prepaid Mail@'), 'internal marker is not printed')
+})
+
+test('Windows print HTML bolds only the service type', async () => {
+  const html = await buildReceiptPrintHtml(receipt, company, printer)
+
+  assert.match(html, /<b>Prepaid Mail<\/b>/)
+  assert.ok(!html.includes('Prepaid Mail@'), 'internal marker is not printed')
 })
 
 test('encodeReceipt uses CP437 text encoding for the configured profile', async () => {

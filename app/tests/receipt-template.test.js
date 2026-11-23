@@ -64,11 +64,25 @@ test('table columns align to reference positions', () => {
   const text = opsText(ops)
   const header = text.find((t) => t.includes('Product'))
   assert.ok(header, 'header row present')
-  // Product left-aligned at start, Qty centered, Unit Price and Price right-aligned
-  assert.ok(header.startsWith('Product'), 'Product starts at left edge: ' + JSON.stringify(header))
-  assert.ok(header.includes('Qty'), 'Qty column present')
-  assert.ok(header.includes('Unit Price'), 'Unit Price column present')
-  assert.ok(header.endsWith('Price'), 'Price ends the row: ' + JSON.stringify(header))
+  const headerRows = header.split('\n')
+  // Product is left-aligned; Unit Price is centered; Qty and Price are right-aligned.
+  assert.ok(headerRows[0].startsWith('Product'), 'Product starts at left edge: ' + JSON.stringify(header))
+  assert.ok(headerRows[0].includes('Qty'), 'Qty column present')
+  assert.ok(headerRows[0].includes('Unit'), 'Unit Price column present')
+  assert.ok(headerRows[0].endsWith('Price'), 'Price ends the row: ' + JSON.stringify(header))
+  assert.ok(headerRows[1].trim().endsWith('Price'), 'Unit Price wraps above Price')
+  const unitColumnStart = Math.floor(42 * 0.46) + Math.floor(42 * 0.12)
+  const unitColumnWidth = Math.floor(42 * 0.18)
+  assert.equal(
+    headerRows[0].slice(unitColumnStart, unitColumnStart + unitColumnWidth).indexOf('Unit'),
+    1,
+    'Unit is centered in its column'
+  )
+  assert.equal(
+    headerRows[1].slice(unitColumnStart, unitColumnStart + unitColumnWidth).indexOf('Price'),
+    1,
+    'wrapped Price is centered in the Unit Price column'
+  )
 })
 
 test('shipment section indentation matches reference levels', () => {
@@ -84,7 +98,7 @@ test('shipment section indentation matches reference levels', () => {
 
   const tracking = text.find((t) => t.includes('9201 9903'))
   assert.ok(tracking, 'tracking number present')
-  assert.ok(tracking.startsWith('      9201'), 'tracking value indented furthest: ' + JSON.stringify(tracking))
+  assert.ok(tracking.startsWith('     9201'), 'tracking value indented furthest: ' + JSON.stringify(tracking))
 })
 
 test('encodes to valid ESC/POS bytes for the 80 mm generic profile', () => {
@@ -119,6 +133,10 @@ test('keeps the fixed insurance row on one line at supported paper widths', () =
       text.some((t) => t.includes('Up to $100.00 included') && t.includes('$0.00')),
       `insurance row is not on one line at ${characterWidth} columns`
     )
+    assert.ok(
+      text.some((t) => t.startsWith('  Up to $100.00 included')),
+      `insurance row is not left-padded at ${characterWidth} columns`
+    )
     assert.ok(!text.includes('included'), `insurance label wrapped at ${characterWidth} columns`)
   }
 })
@@ -130,7 +148,7 @@ test('wraps long product descriptions to the printer width', () => {
   }, company, printer)
 
   const lines = ops.filter((op) => op.kind === 'text')
-    .map((op) => op.text.replace(/\n$/, ''))
+    .flatMap((op) => op.text.replace(/\n$/, '').split('\n'))
   assert.ok(lines.some((t) => t.includes('very long')), 'long product text rendered')
   assert.ok(lines.every((t) => t.length <= 42), `line exceeds width 42: ${JSON.stringify(lines.find((t) => t.length > 42))}`)
 })
@@ -169,7 +187,8 @@ test('maps a single stored line item onto the table columns', () => {
   const text = opsText(ops)
   const row = text.find((t) => t.includes('Prepaid Mail'))
   assert.ok(row, 'product description rendered')
-  assert.ok(row.includes('$65.22'), `unit price rendered as money: ${JSON.stringify(row)}`)
+  assert.ok(row.includes('$65.22'), `price rendered as money: ${JSON.stringify(row)}`)
+  assert.equal(row.match(/\$65\.22/g)?.length, 1, 'unit price column is empty')
   assert.ok(!/\b6522\b/.test(row), 'raw minor units never reach the printer')
 })
 
