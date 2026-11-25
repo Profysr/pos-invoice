@@ -4,7 +4,12 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 import icon from '../../resources/icon.png?asset'
 import { createDatabaseStore, initializeUserData } from './database.js'
-import { buildReceiptPrintHtml, sendBytesLan, sendReceiptLan, encodeReceipt } from './receipt-printing.js'
+import {
+  buildReceiptPrintHtml,
+  sendBytesLan,
+  sendReceiptLan,
+  encodeReceipt
+} from './receipt-printing.js'
 import { printSystem } from './system-print.js'
 
 let database
@@ -68,7 +73,11 @@ async function withLogoDataUrl(company) {
     const mime = mimeTypes[extension]
     if (!mime) return { ...defaultCompany(), ...company, logoDataUrl: null }
     const data = await readFile(logoPath)
-    return { ...defaultCompany(), ...company, logoDataUrl: `data:${mime};base64,${data.toString('base64')}` }
+    return {
+      ...defaultCompany(),
+      ...company,
+      logoDataUrl: `data:${mime};base64,${data.toString('base64')}`
+    }
   } catch {
     return { ...defaultCompany(), ...company, logoDataUrl: null }
   }
@@ -148,7 +157,9 @@ function registerIpcHandlers() {
     }
   })
 
-  ipcMain.handle('company:get', async () => withLogoDataUrl(database.getCompany() || defaultCompany()))
+  ipcMain.handle('company:get', async () =>
+    withLogoDataUrl(database.getCompany() || defaultCompany())
+  )
 
   ipcMain.handle('company:save', async (_event, values) => {
     const saved = database.saveCompany(values)
@@ -181,9 +192,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle('printer:list-system', () => listSystemPrinters())
 
-  // Runs the same code path as a real print with a short test job, without
-  // saving anything. Returns { ok, message } instead of throwing so the
-  // notification shows the raw socket/Windows error without an IPC prefix.
+  // Runs the same code path as a real print with a short test job, without saving anything. Returns { ok, message } instead of throwing so the notification shows the raw socket/Windows error without an IPC prefix.
   ipcMain.handle('printer:test', async (_event, values) => {
     const profile = { ...defaultPrinter(), ...values }
     const lines = [
@@ -199,10 +208,10 @@ function registerIpcHandlers() {
     try {
       const company = database.getCompany() || defaultCompany()
       const logoPath = effectiveLogoPath(company)
+      const printer = database.getPrinter('default')
 
       if (profile.connectionType === 'network') {
-        // Build a minimal receipt so encodeReceipt produces the test page
-        // through the same retail-print-kit pipeline as real receipts.
+        // Build a minimal receipt so encodeReceipt produces the test page through the same retail-print-kit pipeline as real receipts.
         const testReceipt = {
           subtotal: 0,
           shippingFrom: 'PRINTER TEST',
@@ -287,9 +296,7 @@ function registerIpcHandlers() {
 
       let result
       if (printer.connectionType === 'network') {
-        // retail-print-kit path: encode the receipt, then open -> write -> close
-        // on the configured host/port/timeout. Windows system printing below is
-        // untouched.
+        // retail-print-kit path: encode the receipt, then open -> write -> close on the configured host/port/timeout. Windows system printing below is untouched.
         result = await sendReceiptLan(saved, company, printer, { logoPath })
       } else {
         const html = await buildReceiptPrintHtml(saved, company, printer, { logoPath })

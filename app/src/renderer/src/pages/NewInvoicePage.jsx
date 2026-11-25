@@ -43,7 +43,7 @@ function createInitialValues(bootstrap) {
     senderContactArea: '',
     senderContactPrefix: '',
     senderContactLine: '',
-    expectedDeliveryDate: '',
+    expectedDeliveryDate: now.date,
     service: DEFAULT_SHIPPING_SERVICE,
     destCity: '',
     destState: '',
@@ -103,8 +103,8 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
       destCity: requiredValue('Destination city'),
       destState: requiredValue('Destination state'),
       destZip: requiredValue('Destination ZIP'),
-      weightLb: requiredValue('Weight in pounds'),
-      weightOz: requiredValue('Weight in ounces')
+      // weightLb: requiredValue('Weight in pounds'),
+      // weightOz: requiredValue('Weight in ounces')
     }
   })
   

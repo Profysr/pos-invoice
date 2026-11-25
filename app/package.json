@@ -42,9 +42,11 @@
     "@mantine/form": "^9.8.1",
     "@mantine/hooks": "^9.8.1",
     "@mantine/notifications": "^9.8.1",
+    "@napi-rs/canvas": "1.2.1",
     "@tabler/icons-react": "^3.52.0",
     "iconv-lite": "^0.7.3",
-    "retail-print-kit": "0.4.0"
+    "retail-print-kit": "0.4.0",
+    "usb": "2.19.2"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config": "^3.0.0",
