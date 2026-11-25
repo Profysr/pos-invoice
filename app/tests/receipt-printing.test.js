@@ -81,7 +81,8 @@ test('encodeReceipt bolds only the service type', async () => {
 test('Windows print HTML bolds only the service type', async () => {
   const html = await buildReceiptPrintHtml(receipt, company, printer)
 
-  assert.match(html, /<b>Prepaid Mail<\/b>/)
+  // Canonical ops carry bold as a style op; opsToHtml renders it inline.
+  assert.match(html, /font-weight:bold[^>]*>Prepaid Mail/)
   assert.ok(!html.includes('Prepaid Mail@'), 'internal marker is not printed')
 })
 
@@ -165,7 +166,7 @@ test('cut and feed ops are encoded', () => {
 })
 
 test('encodeReceipt embeds a rasterized logo image when one is provided', async () => {
-  // Exact shape returned by src/main/logo-raster.js rasterizeLogo().
+  // Exact shape returned by receipt-printing's defaultRasterizeLogo adapter.
   const logo = {
     data: Buffer.from([0b10100000, 0b01000000]), // MSB-first packed
     bytesPerRow: 2,

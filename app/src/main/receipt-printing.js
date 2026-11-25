@@ -1,25 +1,10 @@
 import { encodeEscPos, NetTransport, opsToHtml, render } from 'retail-print-kit'
 import { RECEIPT_TEMPLATE, buildReceiptViewModel } from '../shared/receipt-template-core.js'
+import { buildReceiptDocument, sanitizeReceiptText } from '../shared/receipt-document.js'
+import { logoWidthDots } from '../shared/receipt-layout.js'
+import { loadLogoBitmap, prepareLogoBitmap } from './logo-bitmap.js'
 
-/**
- * Sanitize text for ESC/POS output. Strips characters thermal printers choke on
- * (non-breaking spaces, curly quotes, control characters) so they never reach
- * the printer stream.
- */
-export function sanitizeEscPosText(value) {
-  return String(value ?? '')
-    .replace(/[\u00a0\u202f]/g, ' ')
-    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
-    .replace(/[×]/g, 'x')
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .split('')
-    .filter((character) => {
-      const code = character.charCodeAt(0)
-      return code >= 32 && code !== 127
-    })
-    .join('')
-}
+export { logoWidthDots }
 
 function boldItemNamesInOps(ops, items) {
   const result = [...ops]
@@ -47,34 +32,20 @@ function boldItemNamesInOps(ops, items) {
   return result
 }
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '\u0026amp;')
-    .replace(/</g, '\u003clt;')
-    .replace(/>/g, '\u003egt;')
-}
-
-function boldItemNamesInHtml(html, items) {
-  let result = html
-  for (const item of items) {
-    const product = String(item?.product ?? '')
-    if (!product) continue
-    const escaped = escapeHtml(product)
-    result = result.replace(`>${escaped}@`, `><b>${escaped}</b>`)
-  }
-  return result
-}
-
 /**
- * Lazily rasterize a company logo using the existing Electron `nativeImage`
- * implementation in src/main/logo-raster.js (main process only).
- *
- * The import is dynamic so this module loads under plain Node in tests;
- * rasterization itself only runs under Electron.
+ * Adapter kept for encodeReceipt's injectable rasterizer contract: it returns
+ * the legacy { data, bytesPerRow, widthDots, heightDots } shape until Phase 5
+ * rewires encodeReceipt onto buildReceiptDocument's SerializedBitmap.
  */
-async function defaultRasterizeLogo(logoPath, options = {}) {
-  const { rasterizeLogo } = await import('./logo-raster.js')
-  return rasterizeLogo(logoPath, options)
+async function defaultRasterizeLogo(logoPath, { widthDots = 400 } = {}) {
+  const bitmap = await loadLogoBitmap(logoPath, widthDots)
+  if (!bitmap) return null
+  return {
+    data: Buffer.from(bitmap.bits),
+    bytesPerRow: Math.ceil(bitmap.width / 8),
+    widthDots: bitmap.width,
+    heightDots: bitmap.height
+  }
 }
 
 /**
@@ -84,14 +55,6 @@ async function defaultRasterizeLogo(logoPath, options = {}) {
 export async function rasterizeReceiptLogo(logoPath, { widthDots = 400 } = {}) {
   if (!logoPath) return null
   return defaultRasterizeLogo(logoPath, { widthDots })
-}
-
-/**
- * Dot width for a logo raster, mirroring the existing print path:
- *   printableDots = printableWidthMm * dotDensity; logo = 70% of printable.
- */
-export function logoWidthDots(printer) {
-  return Math.round(((Number(printer.printableWidthMm) || 72) * (Number(printer.dotDensity) || 8)) * 0.7)
 }
 
 /**
@@ -146,7 +109,7 @@ export async function encodeReceipt(receipt, company, printer, options = {}) {
   // Sanitize text operations before encoding so characters printers choke on (curly quotes, ×, control chars, NBSP) never reach the ESC/POS stream.
   for (const op of ops) {
     if (op.kind === 'text') {
-      op.text = sanitizeEscPosText(op.text)
+      op.text = sanitizeReceiptText(op.text)
     }
   }
 
@@ -195,28 +158,15 @@ export async function sendReceiptLan(receipt, company, printer, options = {}) {
 }
 
 /**
- * Render an HTML receipt for Windows system printing using retail-print-kit's
- * opsToHtml. The company logo is rasterized and prepended as a raster op so it
- * flows through the same pipeline as LAN ESC/POS output.
+ * Render an HTML receipt for Windows system printing from the canonical
+ * receipt document, so bolding, logo and sanitization come from the same
+ * operations as LAN ESC/POS output.
  */
 export async function buildReceiptPrintHtml(receipt, company, printer, options = {}) {
-  const { logoPath, rasterizeLogo = defaultRasterizeLogo } = options
-  const [data, profile] = buildReceiptViewModel(receipt, company, printer)
-  let ops = render(RECEIPT_TEMPLATE, data, profile)
-
-  if (logoPath) {
-    const logoBitmap = await rasterizeLogo(logoPath, { widthDots: logoWidthDots(printer) })
-    if (logoBitmap) {
-      ops.unshift({
-        kind: 'raster',
-        width: logoBitmap.widthDots,
-        height: logoBitmap.heightDots,
-        bits: new Uint8Array(logoBitmap.data)
-      })
-    }
-  }
-
-  return boldItemNamesInHtml(opsToHtml(ops, profile), data.items)
+  const logoBitmap = await prepareLogoBitmap(options.logoPath, printer)
+  const { ops, profile } = buildReceiptDocument({ receipt, company, printer, logoBitmap })
+  // No cutter on a Windows page: the canonical cut op would print as a dashed rule.
+  return opsToHtml(ops.filter((op) => op.kind !== 'cut'), profile)
 }
 
 export { buildReceiptViewModel }

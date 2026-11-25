@@ -235,7 +235,6 @@ Agents should work in separate branches or worktrees. Each file has one phase ow
 
 | Phase | Area | Code dependencies |
 |---|---|---|
-| Phase 0 | Procurement and hardware acceptance preparation | None |
 | Phase 1 | Native dependencies and build baseline | None |
 | Phase 2 | Canonical receipt document and logo preparation | Phase 1 |
 | Phase 3 | Fake transport and virtual-printer test harness | Frozen contracts only |
@@ -262,28 +261,6 @@ Agents should work in separate branches or worktrees. Each file has one phase ow
 | Phase 9 | Full automated and real-hardware acceptance | All previous phases |
 
 ## 6. Phase details
-
-### Phase 0 — Procurement and hardware acceptance preparation
-
-**Goal:** Select hardware that can support the application without depending on Windows printing.
-**Owner scope:** Documentation and hardware research only. No production-code changes.
-**Tasks:**
-
-- [ ] Use the procurement checklist in Section 10.
-- [ ] Prefer an Ethernet ESC/POS model for the first purchase.
-- [ ] Confirm raw TCP printing on port 9100 from the vendor documentation.
-- [ ] Confirm Windows 11 x64 support.
-- [ ] Confirm 80 mm and, if required, 58 mm paper support.
-- [ ] Confirm automatic cutter support.
-- [ ] Request the ESC/POS command manual and USB vendor/product IDs.
-- [ ] Record the expected `retail-print-kit` printer profile.
-- [ ] Prepare LAN and USB acceptance-test procedures.
-
-**Acceptance criteria:**
-
-- A specific printer SKU has been selected or a shortlist is documented.
-- The selection explicitly supports ESC/POS and raw LAN printing.
-- USB is treated as a separately verified capability.
 
 ### Phase 1 — Native dependencies and build baseline
 
