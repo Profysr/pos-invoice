@@ -1,4 +1,6 @@
-/* Thermal receipt preview — dedicated physical-paper styling. */
+/* Thermal receipt preview — frames the canonical HTML rendered inside an
+   isolated iframe. All receipt layout lives inside the iframe (from the
+   canonical operations), so this sheet only frames the preview and errors. */
 .receipt-preview-area {
   display: flex;
   justify-content: center;
@@ -12,82 +14,11 @@
   overflow: auto;
 }
 
-.receipt-paper {
-  flex-shrink: 0;
-  background: var(--mantine-color-white);
-  box-shadow: 0 1px 4px rgba(31, 41, 55, 0.16);
-  padding: 8px 4px;
-  font-family: 'Consolas', 'Courier New', 'DejaVu Sans Mono', monospace;
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--mantine-color-text);
-  word-break: break-word;
-}
-
-.receipt-line {
-  white-space: pre-wrap;
-}
-
-.receipt-logo {
+.receipt-preview-frame {
   display: block;
-  margin: 0 auto 10px;
-  width: 147pt;
-  max-width: 100%;
-  height: auto;
-}
-
-.receipt-divider {
-  border-bottom: 1px dashed var(--mantine-color-text);
-  height: 0;
-  width: 100%;
-  margin: 8px 0;
-}
-
-.receipt-line.align-left {
-  text-align: left;
-}
-
-.receipt-line.align-center {
-  text-align: center;
-}
-
-.receipt-line.align-right {
-  text-align: right;
-}
-
-/* Footer text: larger than body, centered, with letter spacing and line
-   height tuned to match the reference PDF. */
-.receipt-line.receipt-footer {
-  width: 85%;
-  margin-left: auto;
-  margin-right: auto;
-  /* font-size: 1.25em; */
-  letter-spacing: 0.01em;
-  line-height: 1.4;
-}
-
-.receipt-line.receipt-table-header {
-  line-height: 1.1;
-}
-
-.receipt-line.bold {
-  font-weight: 700;
-}
-
-.receipt-line.underline {
-  text-decoration: underline;
-}
-
-.receipt-line.underline-double {
-  text-decoration: underline double;
-}
-
-.receipt-line.font-b {
-  font-size: 0.78em;
-}
-
-.receipt-line.receipt-gap {
-  height: 1.45em;
+  border: none;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(31, 41, 55, 0.16);
 }
 
 .receipt-error {

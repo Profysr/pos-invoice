@@ -1,6 +1,18 @@
-import { render, opsToHtml } from 'retail-print-kit'
+import { render, opsToHtml } from 'retail-print-kit/browser'
 import { RECEIPT_TEMPLATE, buildReceiptViewModel } from './receipt-template-core.js'
-import { logoWidthDots, RECEIPT_LOGO } from './receipt-layout.js'
+import { RECEIPT_LOGO } from './receipt-layout.js'
+
+/**
+ * Decode a base64 bitmap payload without relying on Node's `Buffer`, so the
+ * canonical document can be built in the sandboxed renderer as well as main.
+ */
+function base64ToBytes(base64) {
+  if (typeof Buffer !== 'undefined') return Uint8Array.from(Buffer.from(base64, 'base64'))
+  const bin = atob(base64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
+  return bytes
+}
 
 /**
  * Sanitize text for output. Strips characters thermal printers choke on
@@ -83,7 +95,7 @@ export function buildReceiptDocument({ receipt, company, printer, logoBitmap = n
         kind: 'raster',
         width: logoBitmap.width,
         height: logoBitmap.height,
-        bits: new Uint8Array(Buffer.from(logoBitmap.data, 'base64'))
+        bits: base64ToBytes(logoBitmap.data)
       }
     )
   }

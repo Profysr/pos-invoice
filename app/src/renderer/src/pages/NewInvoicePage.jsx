@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useForm } from '@mantine/form'
 import { Alert, Button, Flex, Loader, ScrollArea } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconAlertCircle } from '@tabler/icons-react'
 import InvoiceForm from '../invoice/InvoiceForm.jsx'
 import ReceiptPreview from '../invoice/ReceiptPreview.jsx'
-import { buildReceiptPreviewLines } from '../invoice/receipt-preview-lines.js'
 import {
   buildShippingReceiptFields,
   normalizeShippingReceiptDraft,
@@ -129,18 +128,7 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
     }
   }, [form.values])
 
-  const receiptPreview = useMemo(
-    () =>
-      buildReceiptPreviewLines(
-        receipt,
-        bootstrap.company || {},
-        bootstrap.printer || { characterWidth: 48, paperWidthMm: 80 }
-      ),
-    [receipt, bootstrap.company, bootstrap.printer]
-  )
 
-  const paperWidth = Number(bootstrap.printer?.paperWidthMm) || 80
-  const characterWidth = Number(bootstrap.printer?.characterWidth) || 48
 
   const handlePrint = useCallback(async () => {
     const validation = form.validate()
@@ -218,11 +206,10 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
       >
         <ScrollArea style={{ width: '100%' }} offsetScrollbars="y">
           <ReceiptPreview
-            receiptLines={receiptPreview.lines}
-            error={receiptPreview.error}
-            paperWidth={paperWidth}
-            characterWidth={characterWidth}
-            logoDataUrl={bootstrap.company?.logoDataUrl || ''}
+            receipt={receipt}
+            company={bootstrap.company || {}}
+            printer={bootstrap.printer || { characterWidth: 48, paperWidthMm: 80 }}
+            logoBitmap={bootstrap.company?.logoBitmap ?? null}
           />
         </ScrollArea>
       </Flex>
