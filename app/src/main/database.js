@@ -141,6 +141,69 @@ const migrations = [
       DROP TABLE company_metadata;
       ALTER TABLE company_metadata_v3 RENAME TO company_metadata;
     `
+  },
+  {
+    version: 4,
+    sql: `
+      -- Widen printer profile connection types to allow USB alongside the legacy
+      -- system/network options, and persist USB vendor/product IDs. Existing
+      -- rows (including legacy 'system' printers) are copied across unchanged.
+      ALTER TABLE printer_profiles ADD COLUMN usb_vendor_id INTEGER;
+      ALTER TABLE printer_profiles ADD COLUMN usb_product_id INTEGER;
+
+      CREATE TABLE printer_profiles_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        connection_type TEXT NOT NULL CHECK (connection_type IN ('network', 'system', 'usb')),
+        network_host TEXT,
+        network_port INTEGER CHECK (network_port BETWEEN 1 AND 65535),
+        system_printer_name TEXT,
+        usb_vendor_id INTEGER,
+        usb_product_id INTEGER,
+        paper_width_mm REAL NOT NULL,
+        printable_width_mm REAL NOT NULL,
+        character_width INTEGER NOT NULL,
+        encoding TEXT NOT NULL DEFAULT 'CP437',
+        cut_after_print INTEGER NOT NULL DEFAULT 1 CHECK (cut_after_print IN (0, 1)),
+        feed_lines_after_print INTEGER NOT NULL DEFAULT 0 CHECK (feed_lines_after_print >= 0),
+        timeout_ms INTEGER NOT NULL DEFAULT 5000 CHECK (timeout_ms >= 100),
+        dot_density REAL NOT NULL DEFAULT 8,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      INSERT INTO printer_profiles_new
+        (id, name, connection_type, network_host, network_port, system_printer_name,
+         usb_vendor_id, usb_product_id,
+         paper_width_mm, printable_width_mm, character_width, dot_density, encoding,
+         cut_after_print, feed_lines_after_print, timeout_ms, created_at, updated_at)
+      SELECT
+        id, name, connection_type, network_host, network_port, system_printer_name,
+        NULL, NULL,
+        paper_width_mm, printable_width_mm, character_width, dot_density, encoding,
+        cut_after_print, feed_lines_after_print, timeout_ms, created_at, updated_at
+      FROM printer_profiles;
+
+      DROP TABLE printer_profiles;
+      ALTER TABLE printer_profiles_new RENAME TO printer_profiles;
+
+      -- Widen print history connection method to allow USB while preserving legacy 'system' rows.
+      CREATE TABLE print_history_new (
+        id TEXT PRIMARY KEY,
+        invoice_id TEXT REFERENCES invoices(id) ON DELETE SET NULL,
+        printer_id TEXT,
+        printer_name TEXT NOT NULL,
+        connection_method TEXT NOT NULL CHECK (connection_method IN ('network', 'system', 'usb')),
+        status TEXT NOT NULL CHECK (status IN ('succeeded', 'failed')),
+        error_message TEXT,
+        printed_at TEXT NOT NULL
+      );
+
+      INSERT INTO print_history_new SELECT * FROM print_history;
+      DROP TABLE print_history;
+      ALTER TABLE print_history_new RENAME TO print_history;
+      CREATE INDEX print_history_invoice_id_idx ON print_history(invoice_id);
+    `
   }
 ]
 
@@ -311,6 +374,8 @@ function mapPrinter(row) {
     networkHost: row.network_host,
     networkPort: row.network_port,
     systemPrinterName: row.system_printer_name,
+    usbVendorId: row.usb_vendor_id,
+    usbProductId: row.usb_product_id,
     paperWidthMm: row.paper_width_mm,
     printableWidthMm: row.printable_width_mm,
     characterWidth: row.character_width,
@@ -466,20 +531,26 @@ export function createDatabaseStore(databasePath) {
       const id = requiredText(input?.id, 'Printer id')
       const name = requiredText(input?.name, 'Printer name')
       const connectionType = requiredText(input?.connectionType, 'Printer connection type')
-      if (!['network', 'system'].includes(connectionType)) {
-        throw new Error('Printer connection type must be network or system')
+      if (!['network', 'usb'].includes(connectionType)) {
+        throw new Error('Printer connection type must be network or usb')
       }
       const networkHost = optionalText(input?.networkHost, 'Network host')
       const networkPort = input?.networkPort ?? 9100
-      const systemPrinterName = optionalText(input?.systemPrinterName, 'System printer name')
+      const usbVendorId = input?.usbVendorId == null ? null : Number(input.usbVendorId)
+      const usbProductId = input?.usbProductId == null ? null : Number(input.usbProductId)
       if (connectionType === 'network' && !networkHost) {
         throw new Error('Network host is required')
       }
-      if (connectionType === 'system' && !systemPrinterName) {
-        throw new Error('System printer name is required')
-      }
-      if (!Number.isInteger(networkPort) || networkPort < 1 || networkPort > 65535) {
+      if (connectionType === 'network' && (!Number.isInteger(networkPort) || networkPort < 1 || networkPort > 65535)) {
         throw new Error('Network port must be between 1 and 65535')
+      }
+      if (connectionType === 'usb') {
+        if (!Number.isInteger(usbVendorId) || usbVendorId <= 0) {
+          throw new Error('USB vendor ID is required')
+        }
+        if (!Number.isInteger(usbProductId) || usbProductId <= 0) {
+          throw new Error('USB product ID is required')
+        }
       }
       const paperWidthMm = positiveNumber(input?.paperWidthMm, 'Paper width')
       const printableWidthMm = positiveNumber(input?.printableWidthMm, 'Printable width')
@@ -507,15 +578,18 @@ export function createDatabaseStore(databasePath) {
         .prepare(
           `INSERT INTO printer_profiles
              (id, name, connection_type, network_host, network_port, system_printer_name,
+              usb_vendor_id, usb_product_id,
               paper_width_mm, printable_width_mm, character_width, dot_density, encoding,
               cut_after_print, feed_lines_after_print, timeout_ms, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              name = excluded.name,
              connection_type = excluded.connection_type,
              network_host = excluded.network_host,
              network_port = excluded.network_port,
              system_printer_name = excluded.system_printer_name,
+             usb_vendor_id = excluded.usb_vendor_id,
+             usb_product_id = excluded.usb_product_id,
              paper_width_mm = excluded.paper_width_mm,
              printable_width_mm = excluded.printable_width_mm,
              character_width = excluded.character_width,
@@ -532,7 +606,9 @@ export function createDatabaseStore(databasePath) {
           connectionType,
           connectionType === 'network' ? networkHost : null,
           connectionType === 'network' ? networkPort : null,
-          connectionType === 'system' ? systemPrinterName : null,
+          null,
+          connectionType === 'usb' ? usbVendorId : null,
+          connectionType === 'usb' ? usbProductId : null,
           paperWidthMm,
           printableWidthMm,
           characterWidth,
@@ -726,8 +802,8 @@ export function createDatabaseStore(databasePath) {
       const printerId = input?.printerId ? optionalText(input.printerId, 'Printer id') : null
       const printerName = requiredText(input?.printerName, 'Printer name')
       const connectionMethod = requiredText(input?.connectionMethod, 'Connection method')
-      if (!['network', 'system'].includes(connectionMethod)) {
-        throw new Error('Connection method must be network or system')
+      if (!['network', 'system', 'usb'].includes(connectionMethod)) {
+        throw new Error('Connection method must be network, system or usb')
       }
       const status = requiredText(input?.status, 'Print status')
       if (!['succeeded', 'failed'].includes(status)) {
@@ -773,8 +849,8 @@ export function createDatabaseStore(databasePath) {
       const printerId = input?.printerId ? optionalText(input.printerId, 'Printer id') : null
       const printerName = requiredText(input?.printerName, 'Printer name')
       const connectionMethod = requiredText(input?.connectionMethod, 'Connection method')
-      if (!['network', 'system'].includes(connectionMethod)) {
-        throw new Error('Connection method must be network or system')
+      if (!['network', 'system', 'usb'].includes(connectionMethod)) {
+        throw new Error('Connection method must be network, system or usb')
       }
       const status = requiredText(input?.status, 'Print status')
       if (!['succeeded', 'failed'].includes(status)) {

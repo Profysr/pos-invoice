@@ -15,23 +15,27 @@ import { paperPreset } from '../../../shared/paper.js'
 
 function PrinterSettingsSection({
   initialData,
-  systemPrinters = [],
+  usbPrinters = [],
   onSave,
   onTest,
   saving = false,
   testing = false
 }) {
+  const usbDevice = initialData.usbVendorId != null && initialData.usbProductId != null
+    ? `${initialData.usbVendorId}:${initialData.usbProductId}`
+    : ''
+
   const form = useForm({
     mode: 'uncontrolled',
     initialValues: {
       name: initialData.name || 'Counter Printer',
-      connectionType: initialData.connectionType || 'system',
+      connectionType: initialData.connectionType || 'network',
       networkHost: initialData.networkHost || '',
       networkPort: Number(initialData.networkPort) || 9100,
-      systemPrinterName: initialData.systemPrinterName || '',
-      // The only format question the user answers; the grid is derived on save.
+      // A single "vendor:product" string held in the form; split into the two
+      // DB columns on save. Nothing is hardcoded here.
+      usbDevice,
       paperWidthMm: Number(initialData.paperWidthMm) === 58 ? '58' : '80',
-      // Kept in the profile but no longer asked for — values round-trip on save.
       printableWidthMm: Number(initialData.printableWidthMm) || 72,
       characterWidth: Number(initialData.characterWidth) || 48,
       dotDensity: Number(initialData.dotDensity) || 8,
@@ -43,25 +47,22 @@ function PrinterSettingsSection({
   })
 
   const connectionType = form.values.connectionType
-  const printerOptions = [
-    { value: '', label: 'Choose an installed printer' },
-    ...systemPrinters.map((printer) => ({
-      value: printer.name,
-      label: printer.isDefault ? `${printer.displayName} (default)` : printer.displayName
-    }))
-  ]
-  if (
-    form.values.systemPrinterName &&
-    !printerOptions.some((option) => option.value === form.values.systemPrinterName)
-  ) {
-    printerOptions.push({
-      value: form.values.systemPrinterName,
-      label: form.values.systemPrinterName
-    })
-  }
+  const usbOptions = usbPrinters.map((printer) => ({
+    value: `${printer.vendorId}:${printer.productId}`,
+    label: `0x${printer.vendorId.toString(16).padStart(4, '0')} / 0x${printer.productId.toString(16).padStart(4, '0')}`
+  }))
 
-  // Merge the derived paper grid into whatever the form holds.
-  const buildProfile = (values) => ({ ...values, ...paperPreset(values.paperWidthMm) })
+  const buildProfile = (values) => {
+    const usb = values.connectionType === 'usb'
+      ? String(values.usbDevice ?? '').split(':')
+      : []
+    return {
+      ...values,
+      ...paperPreset(values.paperWidthMm),
+      usbVendorId: values.connectionType === 'usb' && usb.length === 2 ? Number(usb[0]) : null,
+      usbProductId: values.connectionType === 'usb' && usb.length === 2 ? Number(usb[1]) : null
+    }
+  }
 
   return (
     <form onSubmit={form.onSubmit((values) => onSave(buildProfile(values)))}>
@@ -88,13 +89,12 @@ function PrinterSettingsSection({
             <Select
               label="Connection type"
               data={[
-                { value: 'system', label: 'Windows installed printer' },
-                { value: 'network', label: 'LAN printer (ESC/POS TCP)' }
+                { value: 'network', label: 'LAN printer (ESC/POS TCP)' },
+                { value: 'usb', label: 'USB printer (ESC/POS USB)' }
               ]}
               key={form.key('connectionType')}
               {...form.getInputProps('connectionType')}
             />
-
             {connectionType === 'network' ? (
               <>
                 <TextInput
@@ -115,11 +115,12 @@ function PrinterSettingsSection({
               </>
             ) : (
               <Select
-                label="Installed printer"
-                data={printerOptions}
+                label="USB device"
+                description="Vendor / product ID of the thermal printer"
+                data={usbOptions}
                 searchable
-                key={form.key('systemPrinterName')}
-                {...form.getInputProps('systemPrinterName')}
+                key={form.key('usbDevice')}
+                {...form.getInputProps('usbDevice')}
               />
             )}
           </Stack>

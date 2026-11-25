@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import test from 'node:test'
 import { createDatabaseStore, initializeUserData } from '../src/main/database.js'
@@ -26,7 +26,7 @@ test('initializes user-data paths and applies database migrations', (t) => {
   assert.equal(existsSync(paths.database), true)
   assert.equal(existsSync(paths.uploads), true)
   assert.equal(existsSync(paths.backups), true)
-  assert.equal(store.getVersion(), 3)
+  assert.equal(store.getVersion(), 4)
 })
 
 test('stores settings, company metadata, and printer profiles', (t) => {
@@ -347,4 +347,80 @@ test('generates unique invoice numbers and updates print status', (t) => {
   const afterDelete = store.nextInvoiceNumber()
   assert.notEqual(afterDelete, first)
   assert.notEqual(afterDelete, second)
+})
+
+test('printer profiles round-trip for network and usb with validation', (t) => {
+  const { store } = createTestStore(t)
+
+  const network = store.savePrinter({
+    id: 'net-1', name: 'LAN Printer', connectionType: 'network',
+    networkHost: '192.168.1.50', networkPort: 9100,
+    paperWidthMm: 80, printableWidthMm: 72, characterWidth: 48, dotDensity: 8, encoding: 'CP437'
+  })
+  assert.equal(network.connectionType, 'network')
+  assert.equal(network.networkHost, '192.168.1.50')
+  assert.equal(network.networkPort, 9100)
+  assert.equal(network.usbVendorId, null)
+  assert.equal(network.usbProductId, null)
+
+  const usb = store.savePrinter({
+    id: 'usb-1', name: 'USB Printer', connectionType: 'usb',
+    usbVendorId: 0x04b8, usbProductId: 0x0123,
+    paperWidthMm: 80, printableWidthMm: 72, characterWidth: 48, dotDensity: 8, encoding: 'CP437'
+  })
+  assert.equal(usb.connectionType, 'usb')
+  assert.equal(usb.usbVendorId, 0x04b8)
+  assert.equal(usb.usbProductId, 0x0123)
+
+  assert.throws(
+    () => store.savePrinter({ id: 'u2', name: 'Bad USB', connectionType: 'usb', paperWidthMm: 80, printableWidthMm: 72, characterWidth: 48 }),
+    /USB vendor ID is required/
+  )
+  assert.throws(
+    () => store.savePrinter({ id: 'n2', name: 'Bad Net', connectionType: 'network', paperWidthMm: 80, printableWidthMm: 72, characterWidth: 48 }),
+    /Network host is required/
+  )
+  assert.throws(
+    () => store.savePrinter({ id: 's2', name: 'Sys', connectionType: 'system', paperWidthMm: 80, printableWidthMm: 72, characterWidth: 48 }),
+    /must be network or usb/
+  )
+})
+
+test('legacy system printer rows survive migration to version 4', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'invoice-generator-test-'))
+  let store
+  t.after(() => {
+    if (store) store.close()
+    rmSync(root, { recursive: true, force: true })
+  })
+  const dbPath = join(root, 'database', 'invoices.sqlite')
+  mkdirSync(dirname(dbPath), { recursive: true })
+  const db = new DatabaseSync(dbPath)
+  db.exec('PRAGMA foreign_keys = ON')
+  db.exec(`CREATE TABLE printer_profiles (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL,
+    connection_type TEXT NOT NULL CHECK (connection_type IN ('network', 'system')),
+    network_host TEXT, network_port INTEGER, system_printer_name TEXT,
+    paper_width_mm REAL NOT NULL, printable_width_mm REAL NOT NULL,
+    character_width INTEGER NOT NULL, encoding TEXT NOT NULL DEFAULT 'CP437',
+    cut_after_print INTEGER NOT NULL DEFAULT 1, feed_lines_after_print INTEGER NOT NULL DEFAULT 0,
+    timeout_ms INTEGER NOT NULL DEFAULT 5000, dot_density REAL NOT NULL DEFAULT 8,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`)
+  db.exec(`CREATE TABLE invoices (id TEXT PRIMARY KEY)`)
+  db.exec(`CREATE TABLE print_history (
+    id TEXT PRIMARY KEY, invoice_id TEXT REFERENCES invoices(id) ON DELETE SET NULL,
+    printer_id TEXT, printer_name TEXT NOT NULL, connection_method TEXT NOT NULL,
+    status TEXT NOT NULL, error_message TEXT, printed_at TEXT NOT NULL)`)
+  db.exec("INSERT INTO printer_profiles VALUES ('legacy', 'Old Printer', 'system', NULL, NULL, 'EPSON TM-T88', 80, 72, 48, 'CP437', 1, 0, 5000, 8, '2026-01-01', '2026-01-01')")
+  db.exec('PRAGMA user_version = 3')
+  db.close()
+
+  const paths = initializeUserData(root)
+  store = createDatabaseStore(paths.database)
+
+  assert.equal(store.getVersion(), 4, 'database migrated to version 4')
+  const printer = store.getPrinter('legacy')
+  assert.ok(printer, 'legacy system printer row preserved')
+  assert.equal(printer.connectionType, 'system', 'legacy connection type preserved')
+  assert.equal(printer.systemPrinterName, 'EPSON TM-T88')
 })

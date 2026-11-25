@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('invoiceApi', {
   getPrinter: () => ipcRenderer.invoke('printer:get'),
   savePrinter: (values) => ipcRenderer.invoke('printer:save', values),
   testPrinter: (values) => ipcRenderer.invoke('printer:test', values),
-  listSystemPrinters: () => ipcRenderer.invoke('printer:list-system'),
+  listUsbPrinters: () => ipcRenderer.invoke('printer:list-usb'),
   listInvoices: (options) => ipcRenderer.invoke('invoice:list', options),
   getInvoice: (id) => ipcRenderer.invoke('invoice:get', id),
   deleteInvoice: (id) => ipcRenderer.invoke('invoice:delete', id),

@@ -4,13 +4,9 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 import icon from '../../resources/icon.png?asset'
 import { createDatabaseStore, initializeUserData } from './database.js'
-import {
-  buildReceiptPrintHtml,
-  sendBytesLan,
-  sendReceiptLan,
-  encodeReceipt
-} from './receipt-printing.js'
-import { printSystem } from './system-print.js'
+import { encodeReceipt, sendReceipt } from './receipt-printing.js'
+import { createPrinterTransport, sendBytes, listUsbPrinters } from './printer-transport.js'
+import { prepareLogoBitmap } from './logo-bitmap.js'
 
 let database
 let paths
@@ -27,7 +23,7 @@ function defaultPrinter() {
   return {
     id: 'default',
     name: 'Counter Printer',
-    connectionType: 'system',
+    connectionType: 'network',
     networkHost: '',
     networkPort: 9100,
     systemPrinterName: '',
@@ -83,16 +79,6 @@ async function withLogoDataUrl(company) {
   }
 }
 
-async function listSystemPrinters() {
-  if (!mainWindow || mainWindow.isDestroyed()) return []
-  const printers = await mainWindow.webContents.getPrintersAsync()
-  return printers.map((printer) => ({
-    name: printer.name,
-    displayName: printer.displayName || printer.name,
-    isDefault: Boolean(printer.isDefault)
-  }))
-}
-
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -146,8 +132,15 @@ function registerIpcHandlers() {
     databaseVersion: database.getVersion()
   }))
 
-  ipcMain.handle('invoice:bootstrap', async () => {
+  async function companyWithLogo() {
     const company = await withLogoDataUrl(database.getCompany() || defaultCompany())
+    const printer = database.getPrinter('default') || defaultPrinter()
+    const logoBitmap = await prepareLogoBitmap(company.logoPath, printer)
+    return { ...company, logoBitmap }
+  }
+
+  ipcMain.handle('invoice:bootstrap', async () => {
+    const company = await companyWithLogo()
     const printer = database.getPrinter('default')
     return {
       company,
@@ -157,9 +150,7 @@ function registerIpcHandlers() {
     }
   })
 
-  ipcMain.handle('company:get', async () =>
-    withLogoDataUrl(database.getCompany() || defaultCompany())
-  )
+  ipcMain.handle('company:get', async () => companyWithLogo())
 
   ipcMain.handle('company:save', async (_event, values) => {
     const saved = database.saveCompany(values)
@@ -190,68 +181,35 @@ function registerIpcHandlers() {
     database.savePrinter({ ...values, id: 'default' })
   )
 
-  ipcMain.handle('printer:list-system', () => listSystemPrinters())
+  ipcMain.handle('printer:list-usb', async () => listUsbPrinters())
 
-  // Runs the same code path as a real print with a short test job, without saving anything. Returns { ok, message } instead of throwing so the notification shows the raw socket/Windows error without an IPC prefix.
+  // Runs the same code path as a real print with a short test job, without saving anything. Returns { ok, message } instead of throwing so the notification shows the raw transport error without an IPC prefix.
   ipcMain.handle('printer:test', async (_event, values) => {
     const profile = { ...defaultPrinter(), ...values }
-    const lines = [
-      { text: 'PRINTER TEST', align: 'center', bold: true },
-      { type: 'divider', character: '-' },
-      {
-        text: `${profile.paperWidthMm} mm paper, ${profile.characterWidth} characters per line`,
-        align: 'center'
-      },
-      { text: 'If you can read this, printing works.', align: 'center' }
-    ]
+    const testReceipt = {
+      subtotal: 0,
+      shippingFrom: 'PRINTER TEST',
+      invoiceDate: '',
+      invoiceTime: '',
+      shippingService: `${profile.paperWidthMm} mm paper, ${profile.characterWidth} characters per line`,
+      destinationAddress: '',
+      packageWeight: '',
+      expectedDeliveryDate: '',
+      trackingNumber: '',
+      currency: 'USD'
+    }
 
     try {
       const company = database.getCompany() || defaultCompany()
       const logoPath = effectiveLogoPath(company)
-      const printer = database.getPrinter('default')
-
-      if (profile.connectionType === 'network') {
-        // Build a minimal receipt so encodeReceipt produces the test page through the same retail-print-kit pipeline as real receipts.
-        const testReceipt = {
-          subtotal: 0,
-          shippingFrom: 'PRINTER TEST',
-          invoiceDate: '',
-          invoiceTime: '',
-          shippingService: `${profile.paperWidthMm} mm paper, ${profile.characterWidth} characters per line`,
-          destinationAddress: '',
-          packageWeight: '',
-          expectedDeliveryDate: '',
-          trackingNumber: '',
-          currency: 'USD'
-        }
-        const bytes = await encodeReceipt(testReceipt, company, printer, { logoPath })
-        const result = await sendBytesLan(bytes, profile)
-        return {
-          ok: true,
-          message: `Sent ${result.bytes} bytes to ${profile.networkHost}:${profile.networkPort}.`
-        }
-      }
-
-      if (!profile.systemPrinterName) throw new Error('Choose an installed printer first')
-      const html = await buildReceiptPrintHtml(
-        {
-          subtotal: 0,
-          shippingFrom: 'PRINTER TEST',
-          invoiceDate: '',
-          invoiceTime: '',
-          shippingService: `${profile.paperWidthMm} mm paper, ${profile.characterWidth} characters per line`,
-          destinationAddress: '',
-          packageWeight: '',
-          expectedDeliveryDate: '',
-          trackingNumber: '',
-          currency: 'USD'
-        },
-        company,
-        printer,
-        { logoPath }
-      )
-      await printSystem(html, printer, { silent: true })
-      return { ok: true, message: `Test job sent to "${profile.systemPrinterName}".` }
+      const bytes = await encodeReceipt(testReceipt, company, profile, { logoPath })
+      const transport = createPrinterTransport(profile)
+      await sendBytes(transport, bytes)
+      const target =
+        profile.connectionType === 'network'
+          ? `${profile.networkHost}:${profile.networkPort}`
+          : 'USB printer'
+      return { ok: true, message: `Sent ${bytes.length} bytes to ${target}.` }
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }
@@ -294,14 +252,8 @@ function registerIpcHandlers() {
       const company = database.getCompany() || defaultCompany()
       const logoPath = effectiveLogoPath(company)
 
-      let result
-      if (printer.connectionType === 'network') {
-        // retail-print-kit path: encode the receipt, then open -> write -> close on the configured host/port/timeout. Windows system printing below is untouched.
-        result = await sendReceiptLan(saved, company, printer, { logoPath })
-      } else {
-        const html = await buildReceiptPrintHtml(saved, company, printer, { logoPath })
-        result = await printSystem(html, printer)
-      }
+      // One direct LAN/USB pipeline for every configured printer.
+      const result = await sendReceipt(saved, company, printer, { logoPath })
 
       database.recordPrintResult({
         id: randomUUID(),

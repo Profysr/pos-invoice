@@ -14,10 +14,9 @@ const defaultCompany = {
 const defaultPrinter = {
   id: 'default',
   name: 'Counter Printer',
-  connectionType: 'system',
+  connectionType: 'network',
   networkHost: '',
   networkPort: 9100,
-  systemPrinterName: '',
   paperWidthMm: 80,
   printableWidthMm: 72,
   characterWidth: 48,
@@ -31,7 +30,7 @@ function SettingsModal({ opened, onClose }) {
   const [section, setSection] = useState('company')
   const [company, setCompany] = useState(defaultCompany)
   const [printer, setPrinter] = useState(defaultPrinter)
-  const [systemPrinters, setSystemPrinters] = useState([])
+  const [usbPrinters, setUsbPrinters] = useState([])
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [error, setError] = useState('')
@@ -45,7 +44,7 @@ function SettingsModal({ opened, onClose }) {
       ? Promise.all([
           window.invoiceApi.getCompany(),
           window.invoiceApi.getPrinter(),
-          window.invoiceApi.listSystemPrinters()
+          window.invoiceApi.listUsbPrinters()
         ])
       : Promise.reject(new Error('The application API is unavailable.'))
 
@@ -53,7 +52,7 @@ function SettingsModal({ opened, onClose }) {
       .then(([nextCompany, nextPrinter, printers]) => {
         setCompany(nextCompany || defaultCompany)
         setPrinter(nextPrinter || defaultPrinter)
-        setSystemPrinters(printers || [])
+        setUsbPrinters(printers || [])
       })
       .catch((loadError) => {
         setError(loadError instanceof Error ? loadError.message : String(loadError))
@@ -200,7 +199,7 @@ function SettingsModal({ opened, onClose }) {
             <PrinterSettingsSection
               key={`printer-${refreshKey}`}
               initialData={printer}
-              systemPrinters={systemPrinters}
+              usbPrinters={usbPrinters}
               onSave={handlePrinterSave}
               onTest={handlePrinterTest}
               saving={saving}
