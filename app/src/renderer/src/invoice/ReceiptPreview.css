@@ -21,6 +21,11 @@
   box-shadow: 0 1px 4px rgba(31, 41, 55, 0.16);
 }
 
+/* Ensure the preview area scrolls when a receipt is taller than the viewport. */
+.receipt-preview-area {
+  overflow: auto;
+}
+
 .receipt-error {
   width: 100%;
   padding: 12px;

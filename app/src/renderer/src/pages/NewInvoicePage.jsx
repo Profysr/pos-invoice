@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from '@mantine/form'
 import { Alert, Button, Flex, Loader, ScrollArea } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
@@ -127,8 +127,6 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
       currency: values.currency
     }
   }, [form.values])
-
-
 
   const handlePrint = useCallback(async () => {
     const validation = form.validate()

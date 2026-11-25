@@ -51,6 +51,10 @@ function ReceiptPreview({
   }
 
   const paperPx = Math.round(characterWidth * CELL_PX)
+  // The .paper block in opsToHtml adds padding: 12px top/bottom, cell px left/right.
+  const iframeWidthPx = paperPx + CELL_PX * 2
+  // Thermal receipts are tall and narrow (~1:2.5 width:height). Give the iframe enough height for a full receipt without vertical squishing; the outer container scrolls if the receipt exceeds this.
+  const iframeHeightPx = Math.max(500, Math.round(paperPx * 2.5))
 
   return (
     <div className="receipt-preview-area" data-paper-width={paperWidthMm}>
@@ -58,9 +62,16 @@ function ReceiptPreview({
         className="receipt-preview-frame"
         title="Receipt preview"
         srcDoc={previewHtml}
-        width={paperPx}
-        height={Math.max(300, paperPx)}
+        width={iframeWidthPx}
+        height={iframeHeightPx}
         sandbox="allow-same-origin"
+        style={{
+          display: 'block',
+          border: 'none',
+          background: '#f5f5f5',
+          boxShadow: '0 1px 4px rgba(240, 240, 240, 0.2)',
+          width: `100%`
+        }}
       />
     </div>
   )
