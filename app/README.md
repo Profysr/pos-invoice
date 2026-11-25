@@ -1,6 +1,6 @@
 # Invoice Generator
 
-This is a local Electron app that creates shipping receipts, stores them in SQLite, previews them, and prints them through either a Windows printer or a LAN ESC/POS printer. Local-first Windows invoice and thermal receipt generator built with Electron, React, Mantine, and SQLite.
+This is a local Electron app that creates shipping receipts, stores them in SQLite, previews them, and prints them directly to an ESC/POS thermal printer over LAN or USB. Local-first Windows invoice and thermal receipt generator built with Electron, React, Mantine, and SQLite.
 
 ## Requirements
 
@@ -22,31 +22,46 @@ npm run dist
 
 Local data is stored in Electron's `userData` directory. The SQLite database is at `database/invoices.sqlite`; it is never written inside the installation directory.
 
-## How the printer model works today
+## Printing model
 
-A single row in the `printer_profiles` table describes the printer. Settings → Printer edits that row, and the **Test print** button runs the same code path as a real print with a short test job, so the connection can be verified before saving.
+The app prints directly to ESC/POS thermal printers — there is **no Windows print dialog, no Windows printer selection, and no call to `webContents.print()`**. When the user clicks **Save & Print**, the app:
 
-### Two connection paths
+1. Validates the receipt.
+2. Saves it to SQLite.
+3. Builds one canonical set of `retail-print-kit` receipt operations.
+4. Renders those operations for the on-screen preview (same operations as print).
+5. Encodes the same operations as ESC/POS bytes.
+6. Sends the bytes directly to the configured thermal printer:
+   - LAN through `NetTransport` (raw TCP, port 9100).
+   - USB through `UsbTransport`.
+7. Records success or failure in the database.
 
-**Windows installed printer (`connection_type: 'system'`)** — discovery comes from Windows:
+A separate non-printing Save action is not provided — saving and printing are a single **Save & Print** step.
 
-```
-printer:list-system → webContents.getPrintersAsync() → Windows spooler
-                    → dropdown lists every printer the OS knows (USB + TCP printers added to Windows)
-Print              → receipt rendered as HTML in a hidden window
-                    → webContents.print({ deviceName }) — Windows handles fonts, paper and encoding
-```
+## Printer setup (Settings → Printer)
 
-**LAN ESC/POS (`connection_type: 'network'`)** — raw TCP to `<IP>:9100`:
+A single row in `printer_profiles` describes the printer. The connection type is either **LAN** or **USB** — there is no installed-printer (`system`) option.
 
-```
-Print → escPosBytes(): reset → code page → aligned/wrapped lines → raster logo (GS v 0) → feed → cut
-      → sendNetwork(): socket.connect(host, 9100) → write bytes → close
-```
+### LAN printer
 
-There is **no discovery** on this path: a raw port-9100 printer is invisible to Windows. Read its IP from the printer's self-test page (hold Feed while powering on, on most models) and type it in. The Test button reports the exact socket error (timeout, refused, DNS) if it cannot connect.
+| Field | Description |
+|---|---|
+| Connection type | `network` |
+| Printer host / IP | The printer's IP address (read it from the printer's self-test page — hold Feed while powering on, on most models) |
+| Port | TCP port, normally `9100` |
 
-### Paper width is the only format choice
+There is no discovery on this path: a raw port-9100 printer is invisible to Windows. Type the IP directly. The **Test current settings** button opens the socket, sends a small ESC/POS test receipt, and reports bytes sent or the exact socket error (timeout, refused, DNS) if it cannot connect.
+
+### USB printer
+
+| Field | Description |
+|---|---|
+| Connection type | `usb` |
+| USB device | Choose from discovered USB printer-class devices (`vendorId:productId`) |
+
+USB device names are not shown — only vendor/product IDs, which is all `retail-print-kit` exposes. Known vendor IDs: Epson `0x04b8`, Star Micronics `0x0519`, Bixolon `0x1504`, Citizen `0x1d90`. Prefer an Epson or Bixolon ESC/POS model.
+
+## Paper width
 
 | Field | 80 mm | 58 mm |
 |---|---|---|
@@ -54,9 +69,36 @@ There is **no discovery** on this path: a raw port-9100 printer is invisible to 
 | `printableWidthMm` | 72 | 50 |
 | `characterWidth` | 48 | 32 |
 
-The presets live in `src/shared/paper.js` and are derived on save. Dot density (8 dots/mm), encoding (CP437), cut (on), feed (2 lines) and timeout (5 s) stay in the profile row with fixed defaults — the receipt is plain ASCII so they never need changing, but the columns are kept for printers that do.
+Presets live in `src/shared/paper.js` and are derived on save. Dot density (8 dots/mm), encoding (CP437), cut (on), feed (2 lines) and timeout (5 s) stay in the profile row with fixed defaults.
 
-### Test print
+## Preview and print use one canonical receipt
 
-- **network:** opens the socket, sends a small ESC/POS test receipt, reports bytes sent or the socket error.
-- **system:** prints the same test receipt directly to the chosen printer (`silent: true`, no print dialog).
+The on-screen preview and the ESC/POS print output originate from the same receipt operations (`src/shared/receipt-document.js`) and the same prepared logo bitmap (`src/main/logo-bitmap.js`). Logo size (`RECEIPT_LOGO.widthRatio`, default 70% of printable width) and alignment (center, top) live in `src/shared/receipt-layout.js` — changing them affects both preview and print. Physical output cannot be guaranteed pixel-identical to a browser because browser fonts and printer fonts differ, but both outputs are generated from the same operations and logo bitmap.
+
+## Test print
+
+**Save & Print** prints the receipt directly without a Windows dialog. Failed printing leaves the receipt saved with a `failed` print status and records the error in print history; successful printing records print history.
+
+The **Test current settings** button in Settings exercises the same direct transport as Save & Print, without saving anything, so the connection can be verified before printing receipts.
+
+## Virtual testing (no hardware required)
+
+Automated tests print without Electron or physical hardware:
+
+- A fake `Transport` (`tests/helpers/fake-transport.js`) records written bytes and supports configurable open/write/close failures, so exact ESC/POS payloads and failure paths can be asserted deterministically.
+- A virtual LAN printer (`tests/helpers/virtual-lan-printer.js`) is a local TCP server on `127.0.0.1` that captures ESC/POS bytes, with accept/refuse/timeout/disconnect modes.
+- LAN and USB paths produce identical receipt bytes.
+
+There is no permanent virtual-printer mode in the production UI.
+
+## Hardware acceptance (required before advertising USB)
+
+Real hardware acceptance is still required before releasing LAN or USB support:
+
+- Verify LAN printing over TCP port 9100: paper width, character grid, logo size, logo alignment, text alignment, bolding, cut, and feed.
+- Verify USB device discovery and selection, then repeat the physical checks over USB.
+- Verify a Windows print dialog never appears.
+- Verify failed printing leaves the receipt saved with a failed print status.
+- Verify successful printing records print history.
+
+USB support should not be advertised until USB hardware printing passes.
