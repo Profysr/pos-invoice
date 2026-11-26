@@ -16,6 +16,11 @@
     },
     {
       "type": "text",
+      "value": "{{store.name}}",
+      "align": "center"
+    },
+    {
+      "type": "text",
       "value": "{{store.address}} {{store.city}}",
       "align": "center"
     },
@@ -28,6 +33,10 @@
       "type": "text",
       "value": "{{store.contact}}",
       "align": "center"
+    },
+    {
+      "type": "newline",
+      "count": 1
     },
     {
       "type": "row",
@@ -92,36 +101,38 @@
           "align": "CENTER"
         },
         {
-          "value": "{{unitPrice | money:$}}",
+          "value": "{{unitPrice}}",
           "width": 0.15,
           "align": "RIGHT"
         },
         {
-          "value": "{{price | money:$}}",
+          "value": "{{price}}",
           "width": 0.2,
           "align": "RIGHT"
         }
       ]
     },
     {
-      "type": "each",
-      "items": "items",
+      "type": "text",
+      "value": "{{shipping.destination}}",
+      "style": "normal",
+      "align": "left"
+    },
+    {
+      "type": "if",
+      "when": "shipping.weight",
       "blocks": [
         {
           "type": "text",
-          "value": "  {{description}}"
+          "value": "Weight: {{shipping.weight}}",
+          "style": "normal",
+          "align": "left"
         }
       ]
     },
     {
       "type": "text",
-      "value": "  {{shipping.destination}}",
-      "style": "normal",
-      "align": "left"
-    },
-    {
-      "type": "text",
-      "value": "  Expected Delivery Date:"
+      "value": "Expected Delivery Date:"
     },
     {
       "type": "text",
@@ -129,13 +140,17 @@
       "align": "left"
     },
     {
+      "type": "newline",
+      "count": 1
+    },
+    {
       "type": "text",
-      "value": "  Tracking #:",
+      "value": "Tracking #:",
       "style": "b"
     },
     {
       "type": "text",
-      "value": "        {{shipping.trackingNumber}}",
+      "value": "       {{shipping.trackingNumber}}",
       "style": "b",
       "align": "left"
     },
@@ -171,7 +186,7 @@
           "style": "b"
         },
         {
-          "value": "{{total | money:$}}",
+          "value": "{{total}}",
           "width": 0.3,
           "align": "RIGHT"
         }
@@ -189,7 +204,7 @@
           "style": "b"
         },
         {
-          "value": "{{grandTotal | money:$}}",
+          "value": "{{grandTotal}}",
           "width": 0.3,
           "align": "RIGHT"
         }

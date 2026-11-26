@@ -12,7 +12,7 @@ function optionalText(value, field) {
   return value.trim()
 }
 
-// Keep only what a money amount can hold: digits, one decimal point and two decimals.
+// Keep only digits and one decimal point for the price input field.
 export function sanitizeMoneyInput(value) {
   const raw = String(value ?? '')
   if (raw.trim().startsWith('-')) return ''
@@ -22,6 +22,7 @@ export function sanitizeMoneyInput(value) {
   return cleaned.slice(0, dot + 1) + cleaned.slice(dot + 1).replace(/\./g, '').slice(0, 2)
 }
 
+// Parse a money string into integer minor units (cents) for database storage.
 export function parseMoneyToMinorUnits(value, field = 'Amount') {
   const text = String(value ?? '')
     .trim()
@@ -75,19 +76,13 @@ export function formatReceiptTime(value) {
   return `${hour12}:${match[2]} ${suffix}`;
 }
 
-export function formatMoney(minorUnits, currency = 'USD', locale = 'en-US') {
-  const safeCurrency = /^[A-Z]{3}$/.test(currency) ? currency : 'USD'
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: safeCurrency,
-      currencyDisplay: 'symbol'
-    })
-      .format(minorUnits / 100)
-      .replace(/[\u00a0\u202f]/g, ' ')
-  } catch {
-    return `${(minorUnits / 100).toFixed(2)} ${safeCurrency}`
-  }
+// Format minor units as a dollar string with thousands grouping and two decimals.
+// e.g. 6522 -> "$65.22", 1234567 -> "$12,345.67"
+export function formatPrice(minorUnits) {
+  const dollars = (Number(minorUnits) / 100).toFixed(2)
+  const [whole, fraction] = dollars.split('.')
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return `$${grouped}.${fraction}`
 }
 
 function formatSenderContact(values) {
@@ -250,11 +245,12 @@ export function makeReceiptData(values) {
     description: service,
     qty: '1',
     unitPrice: '',
-    price: price / 100
+    price: formatPrice(price)
   }
 
   return {
     store: {
+      name: values.senderName || '',
       address: values.senderStreet || '',
       city: values.senderCity || '',
       state: values.senderState || '',
@@ -267,10 +263,11 @@ export function makeReceiptData(values) {
     shipping: {
       destination: destinationAddress,
       expectedDelivery: formatReceiptDate(values.expectedDeliveryDate || ''),
-      trackingNumber: groupTrackingNumber(values.trackingNumber || '')
+      trackingNumber: groupTrackingNumber(values.trackingNumber || ''),
+      weight: packageWeight
     },
-    total: price / 100,
-    grandTotal: price / 100,
+    total: formatPrice(price),
+    grandTotal: formatPrice(price),
     shippingFrom,
     destinationAddress,
     packageWeight

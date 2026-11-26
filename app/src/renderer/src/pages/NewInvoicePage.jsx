@@ -51,13 +51,13 @@ function createInitialValues(bootstrap) {
   }
 }
 
-function safeMoney(value) {
-  try {
-    return parseMoneyToMinorUnits(value)
-  } catch {
-    return 0
-  }
-}
+// function safeMoney(value) {
+//   try {
+//     return parseMoneyToMinorUnits(value)
+//   } catch {
+//     return 0
+//   }
+// }
 
 function requiredValue(label) {
   return (value) => (String(value ?? '').trim() ? null : `${label} is required`)

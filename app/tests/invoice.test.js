@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   buildShippingReceiptFields,
-  formatMoney,
+  formatPrice,
   normalizeShippingReceiptDraft,
   parseMoneyToMinorUnits,
   sanitizeMoneyInput,
@@ -30,9 +30,10 @@ test('parses money into integer minor units', () => {
   assert.throws(() => parseMoneyToMinorUnits('abc'), /non-negative/)
 })
 
-test('formats money with the currency symbol', () => {
-  assert.equal(formatMoney(1750, 'USD'), '$17.50')
-  assert.equal(formatMoney(6522, 'USD'), '$65.22')
+test('formats price with thousands grouping and two decimals', () => {
+  assert.equal(formatPrice(1750), '$17.50')
+  assert.equal(formatPrice(6522), '$65.22')
+  assert.equal(formatPrice(1234567), '$12,345.67')
 })
 
 test('builds structured shipping fields and combines the sender contact', () => {

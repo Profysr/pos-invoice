@@ -26,7 +26,7 @@ import {
   IconTrash
 } from '@tabler/icons-react'
 import {
-  formatMoney,
+  formatPrice,
   makeReceiptData,
   normalizeShippingReceiptDraft,
   storedShippingReceiptToDraft
@@ -264,7 +264,7 @@ function SavedInvoicesPage({ onEdit }) {
                     <Table.Td>{invoice.trackingNumber}</Table.Td>
                     <Table.Td>{destination}</Table.Td>
                     <Table.Td style={{ textAlign: 'right' }}>
-                      {formatMoney(invoice.total, invoice.currency)}
+                      {formatPrice(invoice.total)}
                     </Table.Td>
                     <Table.Td>
                       <Badge color={status.color} variant="light" size="sm">
