@@ -4,38 +4,31 @@ import {
   Divider,
   Group,
   NumberInput,
-  SegmentedControl,
-  Select,
   Stack,
   Text,
   TextInput
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { paperPreset } from '../../../shared/paper.js'
 
+/**
+ * Printer settings for the MVP: LAN TCP printing only, 80 mm paper only.
+ * USB, 58 mm, and company settings are out of scope for the MVP.
+ */
 function PrinterSettingsSection({
   initialData,
-  usbPrinters = [],
   onSave,
   onTest,
   saving = false,
   testing = false
 }) {
-  const usbDevice = initialData.usbVendorId != null && initialData.usbProductId != null
-    ? `${initialData.usbVendorId}:${initialData.usbProductId}`
-    : ''
-
   const form = useForm({
     mode: 'uncontrolled',
     initialValues: {
       name: initialData.name || 'Counter Printer',
-      connectionType: initialData.connectionType || 'network',
+      connectionType: 'network',
       networkHost: initialData.networkHost || '',
       networkPort: Number(initialData.networkPort) || 9100,
-      // A single "vendor:product" string held in the form; split into the two
-      // DB columns on save. Nothing is hardcoded here.
-      usbDevice,
-      paperWidthMm: Number(initialData.paperWidthMm) === 58 ? '58' : '80',
+      paperWidthMm: '80',
       printableWidthMm: Number(initialData.printableWidthMm) || 72,
       characterWidth: Number(initialData.characterWidth) || 48,
       dotDensity: Number(initialData.dotDensity) || 8,
@@ -46,23 +39,14 @@ function PrinterSettingsSection({
     }
   })
 
-  const connectionType = form.values.connectionType
-  const usbOptions = usbPrinters.map((printer) => ({
-    value: `${printer.vendorId}:${printer.productId}`,
-    label: `0x${printer.vendorId.toString(16).padStart(4, '0')} / 0x${printer.productId.toString(16).padStart(4, '0')}`
-  }))
-
-  const buildProfile = (values) => {
-    const usb = values.connectionType === 'usb'
-      ? String(values.usbDevice ?? '').split(':')
-      : []
-    return {
-      ...values,
-      ...paperPreset(values.paperWidthMm),
-      usbVendorId: values.connectionType === 'usb' && usb.length === 2 ? Number(usb[0]) : null,
-      usbProductId: values.connectionType === 'usb' && usb.length === 2 ? Number(usb[1]) : null
-    }
-  }
+  const buildProfile = (values) => ({
+    ...values,
+    paperWidthMm: 80,
+    printableWidthMm: 72,
+    characterWidth: 48,
+    usbVendorId: null,
+    usbProductId: null
+  })
 
   return (
     <form onSubmit={form.onSubmit((values) => onSave(buildProfile(values)))}>
@@ -83,46 +67,25 @@ function PrinterSettingsSection({
 
         <Box>
           <Text fw={600} size="sm" mb="xs">
-            Connection
+            Connection (LAN TCP only)
           </Text>
           <Stack gap="sm">
-            <Select
-              label="Connection type"
-              data={[
-                { value: 'network', label: 'LAN printer (ESC/POS TCP)' },
-                { value: 'usb', label: 'USB printer (ESC/POS USB)' }
-              ]}
-              key={form.key('connectionType')}
-              {...form.getInputProps('connectionType')}
+            <TextInput
+              label="Printer host / IP"
+              description="The printer's IP address (read it from the printer's self-test page)"
+              placeholder="192.168.1.50"
+              required
+              key={form.key('networkHost')}
+              {...form.getInputProps('networkHost')}
             />
-            {connectionType === 'network' ? (
-              <>
-                <TextInput
-                  label="Printer host / IP"
-                  description="Tip: the printer's self-test page (hold Feed while powering on) prints its IP"
-                  placeholder="192.168.1.50"
-                  required
-                  key={form.key('networkHost')}
-                  {...form.getInputProps('networkHost')}
-                />
-                <NumberInput
-                  label="Port"
-                  min={1}
-                  max={65535}
-                  key={form.key('networkPort')}
-                  {...form.getInputProps('networkPort')}
-                />
-              </>
-            ) : (
-              <Select
-                label="USB device"
-                description="Vendor / product ID of the thermal printer"
-                data={usbOptions}
-                searchable
-                key={form.key('usbDevice')}
-                {...form.getInputProps('usbDevice')}
-              />
-            )}
+            <NumberInput
+              label="Port"
+              description="TCP port for raw ESC/POS printing"
+              min={1}
+              max={65535}
+              key={form.key('networkPort')}
+              {...form.getInputProps('networkPort')}
+            />
           </Stack>
         </Box>
 
@@ -130,18 +93,11 @@ function PrinterSettingsSection({
 
         <Box>
           <Text fw={600} size="sm" mb="xs">
-            Paper
+            Paper (80 mm only)
           </Text>
-          <SegmentedControl
-            fullWidth
-            color="accent"
-            autoContrast
-            data={[
-              { value: '80', label: '80 mm (48 chars/line)' }
-            ]}
-            key={form.key('paperWidthMm')}
-            {...form.getInputProps('paperWidthMm')}
-          />
+          <Text size="xs" c="dimmed">
+            80 mm paper, 48 characters per line, 72 mm printable width.
+          </Text>
         </Box>
 
         <Divider />

@@ -4,6 +4,7 @@ import test from 'node:test'
 import { NetTransport, encodeEscPos, profiles } from 'retail-print-kit'
 import { UsbTransport } from 'retail-print-kit/usb'
 import { FakeTransport } from '../tests/helpers/fake-transport.js'
+import { makeReceiptData } from '../src/shared/invoice.js'
 import {
   encodeReceipt,
   sendReceipt
@@ -11,16 +12,20 @@ import {
 import { createPrinterTransport, listUsbPrinters, sendBytes } from '../src/main/printer-transport.js'
 
 const receipt = {
+  senderName: 'DE MOSS',
+  senderStreet: '5800 Corporate Dr',
+  senderCity: 'Houston',
+  senderState: 'TX',
+  senderZip: '77036',
   invoiceDate: '2026-08-10',
   invoiceTime: '18:06',
   trackingNumber: '9201990367007536409945',
   subtotal: 6522,
-  insurance: 0,
-  shippingFrom: 'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036',
-  expectedDeliveryDate: '2026-08-13',
   shippingService: 'Prepaid Mail',
-  destinationAddress: 'DANBURY CT 06810',
-  packageWeight: '14 lb 6.0 oz',
+  expectedDeliveryDate: '2026-08-13',
+  destinationCity: 'DANBURY',
+  destinationState: 'CT',
+  destinationZip: '06810',
   currency: 'USD'
 }
 
@@ -100,20 +105,20 @@ test('listUsbPrinters returns [{ vendorId, productId }] entries', async () => {
 // --- ESC/POS encoding (canonical document) --------------------------------
 
 test('encodeReceipt generates ESC/POS bytes without a logo', async () => {
-  const bytes = await encodeReceipt(receipt, company, printer)
+  const bytes = await encodeReceipt(makeReceiptData(receipt), printer)
   assert.ok(Buffer.isBuffer(bytes))
   assert.ok(bytes.length > 0)
   assert.equal(bytes[0], 0x1b)
   assert.equal(bytes[1], 0x40) // ESC @ initialization
   const latin = bytes.toString('latin1')
-  assert.ok(latin.includes('DE MOSS'), 'shipping from present')
+  assert.ok(latin.includes('5800 Corporate Dr'), 'sender address present')
   assert.ok(latin.includes('Prepaid Mail'), 'product present')
   assert.ok(latin.includes('$65.22'), 'total present')
   assert.ok(latin.includes('Text your tracking number to 28777'), 'footer present')
 })
 
 test('encodeReceipt bolds only the service type and strips the marker', async () => {
-  const bytes = await encodeReceipt(receipt, company, printer)
+  const bytes = await encodeReceipt(makeReceiptData(receipt), printer)
   const service = Buffer.from('Prepaid Mail')
   const serviceIndex = bytes.indexOf(service)
   assert.ok(serviceIndex >= 0, 'service type present')
@@ -133,7 +138,7 @@ test('encodeReceipt bolds only the service type and strips the marker', async ()
 })
 
 test('encodeReceipt includes the template logo raster', async () => {
-  const bytes = await encodeReceipt(receipt, company, printer)
+  const bytes = await encodeReceipt(makeReceiptData(receipt), printer)
   assert.notEqual(bytes.indexOf(Buffer.from([0x1d, 0x76, 0x30, 0x00])), -1, 'GS raster command from the template image block')
 })
 

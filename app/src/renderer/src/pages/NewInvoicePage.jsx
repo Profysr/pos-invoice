@@ -6,12 +6,11 @@ import { IconAlertCircle } from '@tabler/icons-react'
 import InvoiceForm from '../invoice/InvoiceForm.jsx'
 import ReceiptPreview from '../invoice/ReceiptPreview.jsx'
 import {
-  buildShippingReceiptFields,
+  makeReceiptData,
   normalizeShippingReceiptDraft,
   parseMoneyToMinorUnits,
   storedShippingReceiptToDraft
 } from '../../../shared/invoice.js'
-import { DEFAULT_SHIPPING_SERVICE } from '../../../shared/shipping-services.js'
 
 function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `row-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -43,13 +42,12 @@ function createInitialValues(bootstrap) {
     senderContactPrefix: '',
     senderContactLine: '',
     expectedDeliveryDate: now.date,
-    service: DEFAULT_SHIPPING_SERVICE,
+    service: 'Prepaid Mail',
     destCity: '',
     destState: '',
     destZip: '',
     weightLb: '',
-    weightOz: '',
-    currency: bootstrap?.company?.defaultCurrency || 'USD'
+    weightOz: ''
   }
 }
 
@@ -101,32 +99,14 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
       senderZip: requiredValue('Sender ZIP'),
       destCity: requiredValue('Destination city'),
       destState: requiredValue('Destination state'),
-      destZip: requiredValue('Destination ZIP'),
-      // weightLb: requiredValue('Weight in pounds'),
-      // weightOz: requiredValue('Weight in ounces')
+      destZip: requiredValue('Destination ZIP')
     }
   })
-  
+
   const [invoiceId, setInvoiceId] = useState(() => editInvoice?.id ?? createId())
   const [printing, setPrinting] = useState(false)
 
-  const receipt = useMemo(() => {
-    const values = form.values
-    const price = safeMoney(values.price)
-    const shipping = buildShippingReceiptFields(values)
-    return {
-      invoiceDate: values.date,
-      invoiceTime: values.time,
-      trackingNumber: values.trackingNumber,
-      subtotal: price,
-      insurance: 0,
-      total: price,
-      ...shipping,
-      shippingService: values.service,
-      expectedDeliveryDate: values.expectedDeliveryDate,
-      currency: values.currency
-    }
-  }, [form.values])
+  const receiptData = useMemo(() => makeReceiptData(form.values), [form.values])
 
   const handlePrint = useCallback(async () => {
     const validation = form.validate()
@@ -204,9 +184,8 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
       >
         <ScrollArea style={{ width: '100%' }} offsetScrollbars="y">
           <ReceiptPreview
-            receipt={receipt}
-            company={bootstrap.company || {}}
-            printer={bootstrap.printer || { characterWidth: 48, paperWidthMm: 80 }}
+            receiptData={receiptData}
+            printer={bootstrap?.printer || { characterWidth: 48, paperWidthMm: 80 }}
           />
         </ScrollArea>
       </Flex>
@@ -221,7 +200,6 @@ function NewInvoicePage({ editInvoice = null }) {
 
   useEffect(() => {
     let active = true
-    // Reject through a promise so no state is set synchronously inside the effect.
     const request = window.invoiceApi?.getBootstrap
       ? window.invoiceApi.getBootstrap()
       : Promise.reject(new Error('The application API is unavailable.'))

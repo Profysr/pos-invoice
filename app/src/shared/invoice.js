@@ -38,6 +38,13 @@ export function parseMoneyToMinorUnits(value, field = 'Amount') {
   return minorUnits
 }
 
+// "9201990367007536409945" -> "9201 9903 6700 7536 4099 45"
+export function groupTrackingNumber(value) {
+  const text = String(value ?? '').trim();
+  if (!text || !/^\d+$/.test(text)) return text;
+  return text.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
 export function formatMoney(minorUnits, currency = 'USD', locale = 'en-US') {
   const safeCurrency = /^[A-Z]{3}$/.test(currency) ? currency : 'USD'
   try {
@@ -134,7 +141,7 @@ export function normalizeShippingReceiptDraft(values, id) {
     customerPhone: '',
     customerEmail: '',
     customerAddress: '',
-    currency: requiredText(values?.currency ?? 'USD', 'Currency').toUpperCase(),
+    currency: 'USD',
     insurance: 0,
     shippingService: optionalText(values?.service, 'Shipping service'),
     ...shipping,
@@ -142,8 +149,6 @@ export function normalizeShippingReceiptDraft(values, id) {
     trackingNumber: requiredText(values?.trackingNumber, 'Tracking number'),
     notes: ''
   }
-
-  if (invoice.currency.length !== 3) throw new Error('Currency must have three letters')
 
   const price = parseMoneyToMinorUnits(values?.price, 'Price')
   const items = [
@@ -156,6 +161,88 @@ export function normalizeShippingReceiptDraft(values, id) {
   ]
 
   return { invoice, items }
+}
+
+/**
+ * Build template-ready receipt data from raw invoice form values.
+ *
+ * This is the single data-preparation function used by both preview and
+ * printing. It accepts raw form values (or a DB-shaped invoice) and returns
+ * one predictable object whose field names match the placeholders in
+ * receipt-template.json.
+ *
+ * Money is kept as integer minor units (the database representation) and
+ * formatted only by the template's `money:$` filter at render time.
+ * Dates are passed as raw ISO strings; the template's `date` filter handles
+ * display formatting. Tracking numbers are grouped here because no template
+ * filter exists for that.
+ *
+ * @param {object} values - raw Mantine form values or DB-shaped invoice
+ * @returns {object} template-ready data object
+ */
+export function makeReceiptData(values) {
+  // Detect DB-shaped invoice (has invoiceDate) vs form values (has date)
+  const isDbInvoice = values.invoiceDate !== undefined
+
+  const senderContact = formatSenderContact(values)
+
+  const shippingFrom = [
+    values.senderName,
+    [values.senderStreet, values.senderCity].filter(Boolean).join(' '),
+    [values.senderState, values.senderZip].filter(Boolean).join(' '),
+    senderContact
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const destinationStateZip = [values.destState || values.destinationState, values.destZip || values.destinationZip]
+    .filter(Boolean)
+    .join(' ')
+  const destinationAddress = [values.destCity || values.destinationCity, destinationStateZip]
+    .filter(Boolean)
+    .join(', ')
+
+  const packageWeight = values.packageWeight
+    ? values.packageWeight
+    : [values.weightLb && `${values.weightLb} lb`, values.weightOz && `${values.weightOz} oz`]
+        .filter(Boolean)
+        .join(' ')
+
+  const price = isDbInvoice
+    ? Number(values.subtotal) || 0
+    : parseMoneyToMinorUnits(values.price, 'Price')
+
+  const service = values.service || values.shippingService || 'Prepaid Mail'
+  const item = {
+    name: service,
+    description: service,
+    qty: '1',
+    unitPrice: '',
+    price: price / 100
+  }
+
+  return {
+    store: {
+      address: values.senderStreet || '',
+      city: values.senderCity || '',
+      state: values.senderState || '',
+      zip: values.senderZip || '',
+      contact: senderContact
+    },
+    date: isDbInvoice ? values.invoiceDate : (values.date || ''),
+    time: isDbInvoice ? values.invoiceTime : (values.time || ''),
+    items: [item],
+    shipping: {
+      destination: destinationAddress,
+      expectedDelivery: values.expectedDeliveryDate || '',
+      trackingNumber: groupTrackingNumber(values.trackingNumber || '')
+    },
+    total: price / 100,
+    grandTotal: price / 100,
+    shippingFrom,
+    destinationAddress,
+    packageWeight
+  }
 }
 
 // Convert a stored receipt back into the editable draft values.

@@ -5,26 +5,30 @@ import {
   buildReceiptPreviewHtml
 } from '../src/shared/receipt.js'
 import { encodeReceipt } from '../src/main/receipt-printing.js'
+import { makeReceiptData } from '../src/shared/invoice.js'
 
 const receipt = {
+  senderName: 'DE MOSS',
+  senderStreet: '5800 Corporate Dr',
+  senderCity: 'Houston',
+  senderState: 'TX',
+  senderZip: '77036',
   invoiceDate: '2026-08-10',
   invoiceTime: '18:06',
   trackingNumber: '9201990367007536409945',
   subtotal: 6522,
-  insurance: 0,
-  shippingFrom: 'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036',
-  expectedDeliveryDate: '2026-08-13',
   shippingService: 'Prepaid Mail',
-  destinationAddress: 'DANBURY CT 06810',
-  packageWeight: '14 lb 6.0 oz',
+  expectedDeliveryDate: '2026-08-13',
+  destinationCity: 'DANBURY',
+  destinationState: 'CT',
+  destinationZip: '06810',
   currency: 'USD'
 }
 
-const company = { name: 'Example', defaultCurrency: 'USD' }
 const printer = { characterWidth: 42, paperWidthMm: 80, printableWidthMm: 72, dotDensity: 8 }
 
 test('preview HTML is a complete document built from canonical operations', () => {
-  const { ops, profile } = buildReceiptDocument({ receipt, company, printer })
+  const { ops, profile } = buildReceiptDocument({ receiptData: makeReceiptData(receipt), printer })
   const html = buildReceiptPreviewHtml({ ops, profile })
 
   assert.match(html, /^<!doctype html>/i, 'complete document')
@@ -34,7 +38,7 @@ test('preview HTML is a complete document built from canonical operations', () =
 })
 
 test('preview HTML carries the template logo raster', () => {
-  const { ops, profile } = buildReceiptDocument({ receipt, company, printer })
+  const { ops, profile } = buildReceiptDocument({ receiptData: makeReceiptData(receipt), printer })
   const html = buildReceiptPreviewHtml({ ops, profile })
 
   assert.ok(html.includes('data:image/png;base64,'), 'template logo inlined in preview')
@@ -44,14 +48,14 @@ test('preview HTML carries the template logo raster', () => {
 })
 
 test('preview HTML and ESC/POS payload carry the same visible receipt content', async () => {
-  const { ops, profile } = buildReceiptDocument({ receipt, company, printer })
+  const { ops, profile } = buildReceiptDocument({ receiptData: makeReceiptData(receipt), printer })
   const html = buildReceiptPreviewHtml({ ops, profile })
 
-  const bytes = await encodeReceipt(receipt, company, printer)
+  const bytes = await encodeReceipt(makeReceiptData(receipt), printer)
   const payload = bytes.toString('latin1')
 
   // Plain-text tokens that must appear in both outputs, in order.
-  const tokens = ['DE MOSS', 'Prepaid Mail', 'DANBURY CT 06810', 'Weight: 14 lb 6.0 oz', '$65.22']
+  const tokens = ['5800 Corporate Dr', 'Prepaid Mail', 'DANBURY', '$65.22']
   let cursor = 0
   for (const token of tokens) {
     assert.ok(html.includes(token), `preview HTML missing ${token}`)

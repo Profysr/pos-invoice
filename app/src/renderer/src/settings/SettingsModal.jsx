@@ -2,12 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Flex, Loader, Modal } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconAlertCircle } from '@tabler/icons-react'
-import CompanyMetadataSection from './CompanyMetadataSection'
 import PrinterSettingsSection from './PrinterSettingsSection'
-
-const defaultCompany = {
-  defaultCurrency: 'USD'
-}
 
 const defaultPrinter = {
   id: 'default',
@@ -24,33 +19,27 @@ const defaultPrinter = {
   timeoutMs: 5000
 }
 
+/**
+ * Settings modal for the MVP. Only printer settings are available.
+ * Company settings (currency) and USB printer support are out of scope.
+ */
 function SettingsModal({ opened, onClose }) {
-  const [section, setSection] = useState('company')
-  const [company, setCompany] = useState(defaultCompany)
   const [printer, setPrinter] = useState(defaultPrinter)
-  const [usbPrinters, setUsbPrinters] = useState([])
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const [refreshKey, setRefreshKey] = useState(0)
 
   const load = useCallback(() => {
     setLoading(true)
     setError('')
     const request = window.invoiceApi
-      ? Promise.all([
-          window.invoiceApi.getCompany(),
-          window.invoiceApi.getPrinter(),
-          window.invoiceApi.listUsbPrinters()
-        ])
+      ? window.invoiceApi.getPrinter()
       : Promise.reject(new Error('The application API is unavailable.'))
 
     return request
-      .then(([nextCompany, nextPrinter, printers]) => {
-        setCompany(nextCompany || defaultCompany)
+      .then((nextPrinter) => {
         setPrinter(nextPrinter || defaultPrinter)
-        setUsbPrinters(printers || [])
       })
       .catch((loadError) => {
         setError(loadError instanceof Error ? loadError.message : String(loadError))
@@ -61,7 +50,6 @@ function SettingsModal({ opened, onClose }) {
   useEffect(() => {
     let active = true
     if (opened) {
-      // Defer the request so the effect does not synchronously update state.
       void Promise.resolve().then(() => {
         if (active) void load()
       })
@@ -71,34 +59,11 @@ function SettingsModal({ opened, onClose }) {
     }
   }, [opened, load])
 
-  const handleCompanySave = async (values) => {
-    setSaving(true)
-    try {
-      const saved = await window.invoiceApi.saveCompany(values)
-      setCompany(saved)
-      setRefreshKey((value) => value + 1)
-      notifications.show({
-        color: 'green',
-        title: 'Company settings saved',
-        message: 'Currency saved.'
-      })
-    } catch (saveError) {
-      notifications.show({
-        color: 'red',
-        title: 'Could not save company settings',
-        message: saveError instanceof Error ? saveError.message : String(saveError)
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const handlePrinterSave = async (values) => {
     setSaving(true)
     try {
       const saved = await window.invoiceApi.savePrinter(values)
       setPrinter(saved)
-      setRefreshKey((value) => value + 1)
       notifications.show({
         color: 'green',
         title: 'Printer settings saved',
@@ -140,38 +105,17 @@ function SettingsModal({ opened, onClose }) {
     onClose()
   }
 
-  const sections = [
-    { id: 'company', label: 'Company Metadata' },
-    { id: 'printer', label: 'Printer Settings' }
-  ]
-
   return (
     <Modal
       opened={opened}
       onClose={handleClose}
-      title="Settings"
-      size={900}
+      title="Printer Settings"
+      size={560}
       centered
       withCloseButton
       classNames={{ body: 'settings-modal-body' }}
     >
       <div className="settings-modal-layout">
-        <nav className="settings-side-nav" aria-label="Settings sections">
-          {sections.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              className={
-                section === id
-                  ? 'settings-side-nav-item settings-side-nav-item-active'
-                  : 'settings-side-nav-item'
-              }
-              onClick={() => setSection(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
         <div className="settings-section-area">
           {loading ? (
             <Flex justify="center" align="center" mih={240}>
@@ -184,18 +128,9 @@ function SettingsModal({ opened, onClose }) {
                 Retry
               </Button>
             </Alert>
-          ) : section === 'company' ? (
-            <CompanyMetadataSection
-              key={`company-${refreshKey}`}
-              initialData={company}
-              onSave={handleCompanySave}
-              saving={saving}
-            />
           ) : (
             <PrinterSettingsSection
-              key={`printer-${refreshKey}`}
               initialData={printer}
-              usbPrinters={usbPrinters}
               onSave={handlePrinterSave}
               onTest={handlePrinterTest}
               saving={saving}

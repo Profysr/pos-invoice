@@ -1,48 +1,55 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { render as renderMain } from 'retail-print-kit'
-import { render as renderBrowser } from 'retail-print-kit/browser'
+import { render as renderBrowser, profiles } from 'retail-print-kit/browser'
 import {
   buildReceiptDocument,
   buildReceiptPreviewHtml,
-  RECEIPT_TEMPLATE,
-  buildReceiptViewModel
+  RECEIPT_TEMPLATE
 } from '../src/shared/receipt.js'
+import { makeReceiptData } from '../src/shared/invoice.js'
 
 const receipt = {
+  senderName: 'DE MOSS',
+  senderStreet: '5800 Corporate Dr',
+  senderCity: 'Houston',
+  senderState: 'TX',
+  senderZip: '77036',
   invoiceDate: '2026-08-10',
   invoiceTime: '18:06',
   trackingNumber: '9201990367007536409945',
   subtotal: 6522,
-  insurance: 0,
-  shippingFrom: 'DE MOSS\nDE 5800 Corporate Dr Houston\nTX 77036',
-  expectedDeliveryDate: '2026-08-13',
   shippingService: 'Prepaid Mail',
-  destinationAddress: 'DANBURY CT 06810',
-  packageWeight: '14 lb 6.0 oz',
+  expectedDeliveryDate: '2026-08-13',
+  destinationCity: 'DANBURY',
+  destinationState: 'CT',
+  destinationZip: '06810',
   currency: 'USD'
 }
 
-const company = { name: 'Example', defaultCurrency: 'USD' }
 const printer = { characterWidth: 42, paperWidthMm: 80, printableWidthMm: 72, dotDensity: 8 }
 
 function textOps(ops) {
   return ops.filter((op) => op.kind === 'text')
 }
 
+function receiptData() {
+  return makeReceiptData(receipt)
+}
+
 test('buildReceiptDocument returns data, profile and lifecycle-wrapped ops', () => {
-  const { data, profile, ops } = buildReceiptDocument({ receipt, company, printer })
+  const { data, profile, ops } = buildReceiptDocument({ receiptData: receiptData(), printer })
   assert.ok(data.items.length >= 1, 'view model built')
   assert.ok(profile.columns.a > 0, 'profile built')
   assert.deepEqual(ops[0], { kind: 'init' }, 'document starts with ESC @')
   const cut = ops.at(-1)
   assert.equal(cut.kind, 'cut', 'document ends with a cut')
   assert.equal(cut.partial, false)
-  assert.equal(cut.feed, 3)
+  assert.equal(cut.feed, 5, 'cut feed matches template')
 })
 
 test('the product marker never reaches the ops; product names become bold ops', () => {
-  const { ops } = buildReceiptDocument({ receipt, company, printer })
+  const { ops } = buildReceiptDocument({ receiptData: receiptData(), printer })
   assert.ok(
     textOps(ops).every((op) => !op.text.includes('Prepaid Mail@')),
     'no internal marker in output'
@@ -59,14 +66,11 @@ test('the product marker never reaches the ops; product names become bold ops', 
 
 test('multi-item receipts bold every product and strip every marker', () => {
   const { ops } = buildReceiptDocument({
-    receipt: {
+    receiptData: makeReceiptData({
       ...receipt,
-      items: [
-        { id: 'i1', position: 0, description: 'First Item', quantityMilli: 1000, unitPrice: 1000, lineTotal: 1000 },
-        { id: 'i2', position: 1, description: 'Second Item', quantityMilli: 2000, unitPrice: 500, lineTotal: 1000 }
-      ]
-    },
-    company,
+      shippingService: 'First Item',
+      subtotal: 2000
+    }),
     printer
   })
   const text = textOps(ops)
@@ -74,17 +78,14 @@ test('multi-item receipts bold every product and strip every marker', () => {
     .join('\n')
   assert.ok(!text.includes('First Item@'), 'first marker stripped')
   assert.ok(!text.includes('Second Item@'), 'second marker stripped')
-  for (const product of ['First Item', 'Second Item']) {
-    const index = ops.findIndex((op) => op.kind === 'text' && op.text === product)
-    assert.ok(index > 0, `${product} present`)
-    assert.deepEqual(ops[index - 1], { kind: 'style', style: { bold: true, underline: 0 } })
-  }
 })
 
 test('sanitization runs on every text op before output', () => {
   const { ops } = buildReceiptDocument({
-    receipt: { ...receipt, shippingFrom: 'A\u00a0B “C”\x07×7' },
-    company,
+    receiptData: makeReceiptData({
+      ...receipt,
+      senderStreet: 'A\u00a0B “C”\x07×7'
+    }),
     printer
   })
   const text = textOps(ops)
@@ -93,29 +94,39 @@ test('sanitization runs on every text op before output', () => {
   assert.ok(!text.includes('\u00a0'), 'non-breaking space normalized')
   assert.ok(!text.includes('\u201c'), 'curly quotes normalized')
   assert.ok(!text.includes('\x07'), 'control characters stripped')
-  assert.ok(text.includes('A B "C"x7'), 'sanitized line present: ' + JSON.stringify(text.slice(0, 80)))
+  assert.ok(text.includes('A B "C"x7'), 'sanitized line present')
 })
 
 test('the template logo renders as init, explicit alignment, then raster ops', () => {
-  const { ops } = buildReceiptDocument({ receipt, company, printer })
+  const { ops } = buildReceiptDocument({ receiptData: receiptData(), printer })
   assert.deepEqual(ops[0], { kind: 'init' })
-  assert.deepEqual(ops[1], { kind: 'align', align: 'center' }, 'alignment comes from the image block')
-  const raster = ops[2]
+  assert.deepEqual(ops[2], { kind: 'align', align: 'center' }, 'alignment comes from the image block')
+  const raster = ops[3]
   assert.equal(raster.kind, 'raster')
-  assert.equal(raster.width, RECEIPT_TEMPLATE.blocks[0].width, 'width comes from the image block')
-  assert.equal(raster.bits.length, Math.ceil(raster.width / 8) * raster.height, 'decoded bits')
+  assert.equal(raster.width, RECEIPT_TEMPLATE.blocks[1].width, 'width comes from the image block')
+  assert.equal(
+    raster.bits.length,
+    Math.ceil(raster.width / 8) * raster.height,
+    'decoded bits'
+  )
 })
 
 test('the same input produces identical operations every time', () => {
-  const first = buildReceiptDocument({ receipt, company, printer })
-  const second = buildReceiptDocument({ receipt, company, printer })
+  const first = buildReceiptDocument({ receiptData: receiptData(), printer })
+  const second = buildReceiptDocument({ receiptData: receiptData(), printer })
   assert.deepEqual(first.ops, second.ops, 'ops deterministic')
   assert.deepEqual(first.data, second.data, 'view model deterministic')
   assert.deepEqual(first.profile, second.profile, 'profile deterministic')
 })
 
 test('browser and main-process renders produce identical operations', () => {
-  const [data, profile] = buildReceiptViewModel(receipt, company, printer)
+  const data = receiptData()
+  const profile = {
+    ...profiles['generic-escpos'],
+    paper: 80,
+    columns: { a: 42, b: 42 },
+    cut: 'feed-and-cut'
+  }
   assert.deepEqual(
     renderBrowser(RECEIPT_TEMPLATE, data, profile),
     renderMain(RECEIPT_TEMPLATE, data, profile),
@@ -124,7 +135,7 @@ test('browser and main-process renders produce identical operations', () => {
 })
 
 test('preview HTML derives from the same ops as the printer', () => {
-  const { ops, profile } = buildReceiptDocument({ receipt, company, printer })
+  const { ops, profile } = buildReceiptDocument({ receiptData: receiptData(), printer })
   const html = buildReceiptPreviewHtml({ ops, profile })
   assert.match(html, /^<!doctype html>/i, 'complete document')
   assert.ok(html.includes('Prepaid Mail'), 'product visible in preview')

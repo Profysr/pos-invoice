@@ -13,14 +13,12 @@ const CELL_PX = 8
  * `buildReceiptDocument`.
  *
  * Props:
- * - receipt: stored invoice / view-model source
- * - company: company metadata
+ * - receiptData: template-ready data from makeReceiptData()
  * - printer: { paperWidthMm, characterWidth, ... }
  * - error: preview error message; shown instead of a receipt
  */
 function ReceiptPreview({
-  receipt = {},
-  company = {},
+  receiptData = {},
   printer = {},
   error = ''
 }) {
@@ -30,7 +28,7 @@ function ReceiptPreview({
   let previewHtml = ''
   if (!error) {
     try {
-      const { ops, profile } = buildReceiptDocument({ receipt, company, printer })
+      const { ops, profile } = buildReceiptDocument({ receiptData, printer })
       previewHtml = buildReceiptPreviewHtml({ ops, profile })
     } catch (renderError) {
       error = renderError instanceof Error ? renderError.message : String(renderError)
