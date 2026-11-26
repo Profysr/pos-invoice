@@ -1,4 +1,4 @@
-import { buildReceiptDocument, buildReceiptPreviewHtml } from '../../../shared/receipt-document.js'
+import { buildReceiptDocument, buildReceiptPreviewHtml } from '../../../shared/receipt.js'
 
 /** CSS px per dot at the preview's 96 dpi baseline (retail-print-kit uses 8px cells). */
 const CELL_PX = 8
@@ -16,14 +16,12 @@ const CELL_PX = 8
  * - receipt: stored invoice / view-model source
  * - company: company metadata
  * - printer: { paperWidthMm, characterWidth, ... }
- * - logoBitmap: serialized logo bitmap { width, height, data } or null
  * - error: preview error message; shown instead of a receipt
  */
 function ReceiptPreview({
   receipt = {},
   company = {},
   printer = {},
-  logoBitmap = null,
   error = ''
 }) {
   const paperWidthMm = Number(printer?.paperWidthMm) || 80
@@ -32,7 +30,7 @@ function ReceiptPreview({
   let previewHtml = ''
   if (!error) {
     try {
-      const { ops, profile } = buildReceiptDocument({ receipt, company, printer, logoBitmap })
+      const { ops, profile } = buildReceiptDocument({ receipt, company, printer })
       previewHtml = buildReceiptPreviewHtml({ ops, profile })
     } catch (renderError) {
       error = renderError instanceof Error ? renderError.message : String(renderError)

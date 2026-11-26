@@ -1,0 +1,273 @@
+{
+  "name": "usps-shipping-receipt",
+  "version": 1,
+  "kind": "receipt",
+  "blocks": [
+    {
+      "type": "newline",
+      "count": 2
+    },
+    {
+      "type": "image",
+      "align": "center",
+      "width": 384,
+      "height": 96,
+      "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///////////4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA///////////wAA+AfB8A+Hx//+P//j/8AAH/5//+H8P//x//4f/gAAAAAAAAAAAAD//////////wAA+AfB8A+Hx//+P//j//AAP/5//8P8P//x//4//gAAAAAAAAAAAAAH/////////wAA8AfB+A+Hx//+P//H//gAf/7//8P8P//z//5//gAAAAAAAAAAAAAAf////////wAB8AeD+A8Hx//8f//H//gA/8D//8f8P//j//7/wAAAAAAAAAAAAAAAB////////gAB8AeD/A8HwB8AfAAHwPwA/AAB4Af8APgD4AD8AAAAAAAAAAAAAAAAAD///////gAB8A+D/B8PgB8AfAAHgHwA+AAD4A/8APADwAD8AAAAAAAAAAAAAAAAAAH//////gAB8A+D/B8PgB4AfAAHgDwA/AAD4A/+APAHwAD8AAAAAAAAAAAAAAAAAAAf/////gAB4A+D/h4PgD4AfAAPgD4A/gAD4B9+AfAHwAD+AAAAAAAAAAAAAAAAAAAA/////gAD4A8H/h4PgD4A//8PgD4AfwADwB5+AfAH//h/AAAAAAAAAAAAAAAAAAAAH////AAD4B8H3x4PAD4A//+PgD4AP4ADwD5+AfAH//g/gAAAAAAAAAAAAAAAAAAAA////AAD4B8Hnz4fAD4A//8PAD4AH8AHwDw+AeAH//gfwAAAAAAAAAAAAAAAAAAAAf///AAD4B8Hjz4fAHwA//8fADwAD+AHwHw+A+AP//gP4AAAAAAAAAAD////////wH///AADwB8Pj7wfAHwA+AAfAHwAB/AHwHg+A+APgAAH8AAAAAAAAAAH////////+AA//AAHwB4Pj/wfAHwB8AAfAHwAA/AHgPg+A+APgAAD8AAAAAAAAAAH/////////gAP+AAHwD4Ph/weAHwB8AAfAPwAAfgPgPA/A+APAAAB+AAAAAAAAAAH/////////xcH+AAHwD4PB/w+AHwB8AAfAPgAAfgPgfA/A8APAAAB+AAAAAAAAAAH///+AAAAAf/H+AAHwHwPA/w+AHgB4AA+AfgAAfgPgeAfB8AfAAAB+AAAAAAAAAAP///+AAAAA//H+AAH4PwfA/g+APgB4AA+A/AAA/gPg+AfB8AfAAAD+AAAAAAAAAAP///+AAAAH//D8AAD//gfA/g+APgD//8//+AH//APB8f/B8Af//f/8AAAAAAAAAAP///+AAAB///D8AAD//geAfg8APgD//8//8AH/+AfB8//B8Af//f/4AAAAAAAAAAP////AAAAAADD8AAB//AeAfh8APAD//8//4AH/8AfD4//B4A///f/wAAAAAAAAAAP////AAAAAADH8AAAf8AeAPh8APAD//5//AAH/wAfDx//j4A///f/AAAAAAAAAAAf////AAAAAADH8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf////AAAAAADH8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf////gAAAB/mP4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf////gAAAf/0P4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf////gAAH/gAf4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/////wAA/8AAf4AD///////////////////////////////////////8AAAAAAAA/////wAH/gAA/4AD///////////////////////////////////////8AAAAAAAA/////wA/8AAD/wAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAQABgACAAAAAAAAAAAAAA/////4H/wAAP/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB/////4f+AAA//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB/////7/4AAH//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB///////gAAf//gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//////8AAB///gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////wAAP///gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//////AAA////gAD/+AD/gAf/n//wfwA8AAAf/H//z/+HwAPHwA/4f/+AAAAAAAD/////8AAH////gAH//gP/4B//P//w/wB8AAB//H//j//HwAfHgP/4//+AAAAAAAD/////wAAf////AAH//gf/8D//P//w/wB8AAD//P//j//DwA+Pgf/4//+AAAAAAAD/////AAD/////AAHx/w//+D/gAPwB/wB8AAD/8P//nwfj4A+Ph/8w//+AAAAAAAH////8AAP/////AAHgHx+B+H4AAPgB/wB4AAH8APgAHwPj4B8Pj/AA+AAAAAAAAAH////wAA//////AAPgHz8A/H4AAPgD/4D4AAH4APgAHwPj4B8Pj8AA8AAAAAAAAAH////AAH//////AAPgHz4AfH4AAPgD/4D4AAH4APAAHwfB4D4PH4AB8AAAAAAAAAH///8AAf/////+AAPgPj4AfD8AAPAH34D4AAH8AfAAHgfB4DwfHwAB8AAAAAAAAAP///wAD//////+AAPgPnwAfD+AAPAHn4D4AAD+AfAAPg+B8HwfPwAB8AAAAAAAAAP///AAP//////+AAPD/nwAfB/AAfAPj4D4AAD/Af/+Pj8B8HgfPgAB//4AEAAAAAP//8AB///////+AAff/HgAfA/gAfAPD4HwAAB/gf/+Pv4B8PgfPgAB//4AggAAAAP//wAH///////8AAff+PgAfAfwAfAfD4HwAAAfwf/+PvwB8PA+PgAD//4BAQAAAAP//AAf///////8AAf/8PgAfAP4AfAeD4HwAAAP4//8PPgA8fA+PgAD//wCfIAAAAf/8AD////////8AAfAAPgA+AH8A+A+D8HwAAAH4+AAfHwA8+A+PgAD4AAAQkAAAAf/wAP////////8AAeAAPgA+AD8A+A8D8HgAAAD8+AAfHwA++A+PgAD4AAAQkAAAAf/AB/////////8AA+AAPgB+AB8A+B8B8PgAAAD88AAfD4A/8A+PgAHwAAERkAAAAf8AH/////////4AA+AAHwD8AD8A+B4B8PgAAAD98AAfD4A/4B8PwAHwAAAfEAAAAf4Af/////////4AA+AAH4H4AH8A8D4B8PgAAAH98AAeD8A/4B8P4AHwAAAREAAAA/gD//////////4AA8AAD+f4//4B8Hx/8P//Af/5//++B8AfwB8H+AH//wCQgAAAA+AP//////////4AB8AAD//w//4B8Hz/8f//A//5//8+B8AfwB8D//H//wBQoAAAA4B///////////4AB8AAB//gf/gB8Pj/+f//A//h//8+A+AfgB4A//H//wAgQAAABgH///////////wAB8AAAf+Af+AB8PD/+f/+A//D//8+A+AfgD4AP/P//wAbAAAAAAAAAAAAAAAAAAAAAAAAADgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "type": "text",
+      "value": "{{store.address}} {{store.city}}",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "value": "{{store.state}} {{store.zip}}",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "value": "{{store.contact}}",
+      "align": "center"
+    },
+    {
+      "type": "row",
+      "cells": [
+        {
+          "value": "{{date | date:datetime}}",
+          "width": 0.7
+        },
+        {
+          "value": "{{time}}",
+          "width": 0.3,
+          "align": "RIGHT"
+        }
+      ]
+    },
+    {
+      "type": "line"
+    },
+    {
+      "type": "row",
+      "cells": [
+        {
+          "value": "Product",
+          "width": 0.5,
+          "style": "b"
+        },
+        {
+          "value": "Qty",
+          "width": 0.15,
+          "align": "CENTER",
+          "style": "b"
+        },
+        {
+          "value": "Unit Price",
+          "width": 0.15,
+          "align": "CENTER",
+          "style": "b"
+        },
+        {
+          "value": "Price",
+          "width": 0.2,
+          "align": "RIGHT",
+          "style": "b"
+        }
+      ]
+    },
+    {
+      "type": "line"
+    },
+    {
+      "type": "table",
+      "rows": "items",
+      "columns": [
+        {
+          "value": "{{name}}@",
+          "width": 0.5,
+          "style": "b"
+        },
+        {
+          "value": "{{qty}}",
+          "width": 0.15,
+          "align": "CENTER"
+        },
+        {
+          "value": "{{unitPrice | money:$}}",
+          "width": 0.15,
+          "align": "RIGHT"
+        },
+        {
+          "value": "{{price | money:$}}",
+          "width": 0.2,
+          "align": "RIGHT"
+        }
+      ]
+    },
+    {
+      "type": "each",
+      "items": "items",
+      "blocks": [
+        {
+          "type": "text",
+          "value": "  {{description}}"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "value": "  {{shipping.destination}}",
+      "style": "normal",
+      "align": "left"
+    },
+    {
+      "type": "text",
+      "value": "  Expected Delivery Date:"
+    },
+    {
+      "type": "text",
+      "value": "       {{shipping.expectedDelivery | date}}",
+      "align": "left"
+    },
+    {
+      "type": "text",
+      "value": "  Tracking #:",
+      "style": "b"
+    },
+    {
+      "type": "text",
+      "value": "        {{shipping.trackingNumber}}",
+      "style": "b",
+      "align": "left"
+    },
+    {
+      "type": "newline",
+      "count": 1
+    },
+    {
+      "type": "row",
+      "cells": [
+        {
+          "value": "Up to $100.00 included",
+          "width": 0.7,
+          "align": "CENTER"
+        },
+        {
+          "value": "$0.00",
+          "width": 0.3,
+          "align": "RIGHT"
+        }
+      ]
+    },
+    {
+      "type": "newline",
+      "count": 1
+    },
+    {
+      "type": "row",
+      "cells": [
+        {
+          "value": "Total",
+          "width": 0.7,
+          "style": "b"
+        },
+        {
+          "value": "{{total | money:$}}",
+          "width": 0.3,
+          "align": "RIGHT"
+        }
+      ]
+    },
+    {
+      "type": "line"
+    },
+    {
+      "type": "row",
+      "cells": [
+        {
+          "value": "Grand Total:",
+          "width": 0.7,
+          "style": "b"
+        },
+        {
+          "value": "{{grandTotal | money:$}}",
+          "width": 0.3,
+          "align": "RIGHT"
+        }
+      ]
+    },
+    {
+      "type": "line"
+    },
+    {
+      "type": "line"
+    },
+    {
+      "type": "newline",
+      "count": 1
+    },
+    {
+      "type": "text",
+      "value": "Text your tracking number to 28777 (2USPS)",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "value": "to get the latest status.Standard Message",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "value": "and Date Rates may apply.You may also",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "value": "visit www.usps.com USPS Tracking or call",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "value": "1-800-222-1811.",
+      "align": "center"
+    },
+    {
+      "type": "newline",
+      "count": 1
+    },
+    {
+      "type": "text",
+      "value": "Save this receipt as evidence of",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "value": "insurance. For information on filing an",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "value": "insurance claim go to",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "value": "https://www.usps.com/help/claims.htm",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "value": "or call 1-800-222-1811.",
+      "align": "center"
+    },
+    {
+      "type": "feed",
+      "value": 3,
+      "lines": 3
+    },
+    {
+      "type": "cut",
+      "feed": 5,
+      "partial": false
+    }
+  ]
+}

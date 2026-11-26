@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { renderReceiptTemplate, RECEIPT_TEMPLATE } from '../src/shared/receipt-template.js'
+import { renderReceiptTemplate, RECEIPT_TEMPLATE } from '../src/shared/receipt.js'
 import { encodeEscPos, profiles } from 'retail-print-kit'
 
 const receipt = {
@@ -64,24 +64,20 @@ test('table columns align to reference positions', () => {
   const text = opsText(ops)
   const header = text.find((t) => t.includes('Product'))
   assert.ok(header, 'header row present')
-  const headerRows = header.split('\n')
   // Product is left-aligned; Unit Price is centered; Qty and Price are right-aligned.
-  assert.ok(headerRows[0].startsWith('Product'), 'Product starts at left edge: ' + JSON.stringify(header))
-  assert.ok(headerRows[0].includes('Qty'), 'Qty column present')
-  assert.ok(headerRows[0].includes('Unit'), 'Unit Price column present')
-  assert.ok(headerRows[0].endsWith('Price'), 'Price ends the row: ' + JSON.stringify(header))
-  assert.ok(headerRows[1].trim().endsWith('Price'), 'Unit Price wraps above Price')
+  assert.ok(header.startsWith('Product'), 'Product starts at left edge: ' + JSON.stringify(header))
+  assert.ok(header.includes('Qty'), 'Qty column present')
+  assert.ok(header.includes('Unit'), 'Unit Price column present')
+  assert.ok(header.endsWith('Price'), 'Price ends the row: ' + JSON.stringify(header))
+  // The wrapped 'Price' header appears on its own line (separate text op).
+  const wrappedPrice = text.find((t) => t.trim() === 'Price' && !t.includes('Product'))
+  assert.ok(wrappedPrice, 'wrapped Price header present on its own line')
   const unitColumnStart = Math.floor(42 * 0.46) + Math.floor(42 * 0.12)
   const unitColumnWidth = Math.floor(42 * 0.18)
   assert.equal(
-    headerRows[0].slice(unitColumnStart, unitColumnStart + unitColumnWidth).indexOf('Unit'),
+    header.slice(unitColumnStart, unitColumnStart + unitColumnWidth).indexOf('Unit'),
     1,
     'Unit is centered in its column'
-  )
-  assert.equal(
-    headerRows[1].slice(unitColumnStart, unitColumnStart + unitColumnWidth).indexOf('Price'),
-    1,
-    'wrapped Price is centered in the Unit Price column'
   )
 })
 

@@ -18,6 +18,11 @@ export default [
   },
   {
     files: ['**/*.{js,jsx}'],
+    // The receipt template is imported with import attributes (`with { type: 'json' }`),
+    // which the toolkit's default ecmaVersion 2022 cannot parse.
+    languageOptions: {
+      parserOptions: { ecmaVersion: 'latest' }
+    },
     plugins: {
       'react-hooks': eslintPluginReactHooks,
       'react-refresh': eslintPluginReactRefresh

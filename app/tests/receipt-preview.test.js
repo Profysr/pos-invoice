@@ -3,7 +3,7 @@ import test from 'node:test'
 import {
   buildReceiptDocument,
   buildReceiptPreviewHtml
-} from '../src/shared/receipt-document.js'
+} from '../src/shared/receipt.js'
 import { encodeReceipt } from '../src/main/receipt-printing.js'
 
 const receipt = {
@@ -33,19 +33,14 @@ test('preview HTML is a complete document built from canonical operations', () =
   assert.ok(!html.includes('Prepaid Mail@'), 'internal marker never reaches preview')
 })
 
-test('preview HTML carries the logo raster when a logo bitmap is provided', () => {
-  const logoBitmap = {
-    width: 16,
-    height: 1,
-    data: Buffer.from([0b10100000, 0b01000000]).toString('base64')
-  }
-  const { ops, profile } = buildReceiptDocument({ receipt, company, printer, logoBitmap })
+test('preview HTML carries the template logo raster', () => {
+  const { ops, profile } = buildReceiptDocument({ receipt, company, printer })
   const html = buildReceiptPreviewHtml({ ops, profile })
 
-  assert.ok(html.includes('data:image/png;base64,'), 'logo raster inlined in preview')
+  assert.ok(html.includes('data:image/png;base64,'), 'template logo inlined in preview')
   const raster = ops.find((op) => op.kind === 'raster')
   assert.ok(raster, 'raster op present')
-  assert.equal(raster.width, 16)
+  assert.equal(raster.width, 384)
 })
 
 test('preview HTML and ESC/POS payload carry the same visible receipt content', async () => {

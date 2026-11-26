@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -68,34 +68,16 @@ test('stores settings, company metadata, and printer profiles', (t) => {
   assert.equal(store.listPrinters().length, 1)
 })
 
-test('validates company currency and logo path before saving', (t) => {
-  const { root, store } = createTestStore(t)
+test('validates company currency before saving', (t) => {
+  const { store } = createTestStore(t)
 
   const empty = store.saveCompany({ defaultCurrency: 'USD' })
-  assert.equal(empty.logoPath, null)
+  assert.equal(empty.defaultCurrency, 'USD')
 
   // Currency stays required and must be a real ISO 4217 code.
   assert.throws(() => store.saveCompany({}), /Default currency is required/)
   assert.throws(() => store.saveCompany({ defaultCurrency: 'US' }), /ISO 4217/)
   assert.throws(() => store.saveCompany({ defaultCurrency: 'ZZZ' }), /ISO 4217/)
-
-  // Logo path safety: shape first, then existence.
-  assert.throws(
-    () => store.saveCompany({ defaultCurrency: 'USD', logoPath: 'relative/logo.png' }),
-    /absolute path/
-  )
-  assert.throws(
-    () => store.saveCompany({ defaultCurrency: 'USD', logoPath: 'C:/temp/logo.txt' }),
-    /PNG, JPG/
-  )
-  assert.throws(
-    () => store.saveCompany({ defaultCurrency: 'USD', logoPath: join(root, 'missing.png') }),
-    /no longer exists/
-  )
-  const logoFile = join(root, 'logo.png')
-  writeFileSync(logoFile, 'png')
-  const withLogo = store.saveCompany({ defaultCurrency: 'USD', logoPath: logoFile })
-  assert.equal(withLogo.logoPath, logoFile)
 
   // created_at survives updates.
   const first = store.saveCompany({ defaultCurrency: 'USD' })

@@ -132,9 +132,9 @@ test('encodeReceipt bolds only the service type and strips the marker', async ()
   assert.ok(!bytes.toString('latin1').includes('Prepaid Mail@'), 'internal marker is not printed')
 })
 
-test('encodeReceipt skips the logo raster when there is no logo path', async () => {
-  const bytes = await encodeReceipt(receipt, company, { ...printer, logoPath: '/tmp/missing.png' })
-  assert.equal(bytes.indexOf(Buffer.from([0x1d, 0x76, 0x30, 0x00])), -1, 'no raster command without a bitmap')
+test('encodeReceipt includes the template logo raster', async () => {
+  const bytes = await encodeReceipt(receipt, company, printer)
+  assert.notEqual(bytes.indexOf(Buffer.from([0x1d, 0x76, 0x30, 0x00])), -1, 'GS raster command from the template image block')
 })
 
 // --- LAN send end-to-end via the direct transport -------------------------

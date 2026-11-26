@@ -1,12 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { copyFile, readFile } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { join } from 'node:path'
 import icon from '../../resources/icon.png?asset'
 import { createDatabaseStore, initializeUserData } from './database.js'
 import { encodeReceipt, sendReceipt } from './receipt-printing.js'
 import { createPrinterTransport, sendBytes, listUsbPrinters } from './printer-transport.js'
-import { prepareLogoBitmap } from './logo-bitmap.js'
 
 let database
 let paths
@@ -14,8 +12,7 @@ let mainWindow
 
 function defaultCompany() {
   return {
-    defaultCurrency: 'USD',
-    logoPath: null
+    defaultCurrency: 'USD'
   }
 }
 
@@ -43,39 +40,6 @@ function localDateParts(date = new Date()) {
   return {
     invoiceDate: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
     invoiceTime: `${pad(date.getHours())}:${pad(date.getMinutes())}`
-  }
-}
-
-// The bundled template logo is used until the client picks one in Settings.
-function defaultLogoPath() {
-  return join(__dirname, '../../resources/receipt-logo.png')
-}
-
-function effectiveLogoPath(company) {
-  return company?.logoPath || defaultLogoPath()
-}
-
-async function withLogoDataUrl(company) {
-  const logoPath = effectiveLogoPath(company)
-  try {
-    const extension = extname(logoPath).toLowerCase()
-    const mimeTypes = {
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.webp': 'image/webp',
-      '.gif': 'image/gif'
-    }
-    const mime = mimeTypes[extension]
-    if (!mime) return { ...defaultCompany(), ...company, logoDataUrl: null }
-    const data = await readFile(logoPath)
-    return {
-      ...defaultCompany(),
-      ...company,
-      logoDataUrl: `data:${mime};base64,${data.toString('base64')}`
-    }
-  } catch {
-    return { ...defaultCompany(), ...company, logoDataUrl: null }
   }
 }
 
@@ -132,15 +96,12 @@ function registerIpcHandlers() {
     databaseVersion: database.getVersion()
   }))
 
-  async function companyWithLogo() {
-    const company = await withLogoDataUrl(database.getCompany() || defaultCompany())
-    const printer = database.getPrinter('default') || defaultPrinter()
-    const logoBitmap = await prepareLogoBitmap(company.logoPath, printer)
-    return { ...company, logoBitmap }
+  function companyRecord() {
+    return database.getCompany() || defaultCompany()
   }
 
   ipcMain.handle('invoice:bootstrap', async () => {
-    const company = await companyWithLogo()
+    const company = companyRecord()
     const printer = database.getPrinter('default')
     return {
       company,
@@ -150,30 +111,9 @@ function registerIpcHandlers() {
     }
   })
 
-  ipcMain.handle('company:get', async () => companyWithLogo())
+  ipcMain.handle('company:get', () => companyRecord())
 
-  ipcMain.handle('company:save', async (_event, values) => {
-    const saved = database.saveCompany(values)
-    return withLogoDataUrl(saved)
-  })
-
-  ipcMain.handle('logo:choose', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Choose company logo',
-      properties: ['openFile'],
-      filters: [
-        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] },
-        { name: 'All files', extensions: ['*'] }
-      ]
-    })
-    if (result.canceled || !result.filePaths[0]) return null
-
-    const source = result.filePaths[0]
-    const extension = extname(source).toLowerCase() || '.png'
-    const target = join(paths.uploads, `logo-${randomUUID()}${extension}`)
-    await copyFile(source, target)
-    return withLogoDataUrl({ logoPath: target })
-  })
+  ipcMain.handle('company:save', (_event, values) => database.saveCompany(values))
 
   ipcMain.handle('printer:get', () => database.getPrinter('default') || defaultPrinter())
 
@@ -201,8 +141,7 @@ function registerIpcHandlers() {
 
     try {
       const company = database.getCompany() || defaultCompany()
-      const logoPath = effectiveLogoPath(company)
-      const bytes = await encodeReceipt(testReceipt, company, profile, { logoPath })
+      const bytes = await encodeReceipt(testReceipt, company, profile)
       const transport = createPrinterTransport(profile)
       await sendBytes(transport, bytes)
       const target =
@@ -250,10 +189,9 @@ function registerIpcHandlers() {
 
     try {
       const company = database.getCompany() || defaultCompany()
-      const logoPath = effectiveLogoPath(company)
 
       // One direct LAN/USB pipeline for every configured printer.
-      const result = await sendReceipt(saved, company, printer, { logoPath })
+      const result = await sendReceipt(saved, company, printer)
 
       database.recordPrintResult({
         id: randomUUID(),

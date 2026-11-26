@@ -1,5 +1,5 @@
-import { mkdirSync, statSync } from 'node:fs'
-import { dirname, extname, isAbsolute, join } from 'node:path'
+import { mkdirSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 const DEFAULT_PAGE_SIZE = 15
@@ -261,28 +261,6 @@ const ISO_4217 =
   typeof Intl.supportedValuesOf === 'function'
     ? new Set(Intl.supportedValuesOf('currency'))
     : new Set()
-const LOGO_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp'])
-
-// Absolute path to an existing image file; rejects null bytes and stale references.
-function optionalLogoPath(value, field) {
-  if (value == null || value === '') return null
-  const path = optionalText(value, field)
-  if (path.includes('\0') || path.length > 1024) {
-    throw new Error(`${field} is not a valid file path`)
-  }
-  if (!isAbsolute(path)) throw new Error(`${field} must be an absolute path`)
-  if (!LOGO_EXTENSIONS.has(extname(path).toLowerCase())) {
-    throw new Error(`${field} must be a PNG, JPG, WEBP or GIF image`)
-  }
-  let stats
-  try {
-    stats = statSync(path)
-  } catch {
-    throw new Error(`${field} no longer exists — choose the logo again`)
-  }
-  if (!stats.isFile()) throw new Error(`${field} must point to a file`)
-  return path
-}
 
 function nonNegativeInteger(value, field) {
   if (!Number.isSafeInteger(value) || value < 0) {
@@ -359,7 +337,6 @@ function mapCompany(row) {
   if (!row) return null
   return {
     defaultCurrency: row.default_currency,
-    logoPath: row.logo_path,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }
@@ -495,7 +472,6 @@ export function createDatabaseStore(databasePath) {
       if (unknownCurrency) {
         throw new Error(`${defaultCurrency} is not a valid ISO 4217 currency code`)
       }
-      const logoPath = optionalLogoPath(input?.logoPath, 'Logo path')
       const timestamp = now()
       const existing = store.getCompany()
 
@@ -504,14 +480,13 @@ export function createDatabaseStore(databasePath) {
       database
         .prepare(
           `INSERT INTO company_metadata
-             (id, default_currency, logo_path, created_at, updated_at)
-           VALUES (1, ?, ?, ?, ?)
+             (id, default_currency, created_at, updated_at)
+           VALUES (1, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              default_currency = excluded.default_currency,
-             logo_path = excluded.logo_path,
              updated_at = excluded.updated_at`
         )
-        .run(defaultCurrency, logoPath, existing?.createdAt ?? timestamp, timestamp)
+        .run(defaultCurrency, existing?.createdAt ?? timestamp, timestamp)
 
       return store.getCompany()
     },

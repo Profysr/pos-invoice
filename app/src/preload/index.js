@@ -5,7 +5,6 @@ contextBridge.exposeInMainWorld('invoiceApi', {
   getBootstrap: () => ipcRenderer.invoke('invoice:bootstrap'),
   getCompany: () => ipcRenderer.invoke('company:get'),
   saveCompany: (values) => ipcRenderer.invoke('company:save', values),
-  chooseLogo: () => ipcRenderer.invoke('logo:choose'),
   getPrinter: () => ipcRenderer.invoke('printer:get'),
   savePrinter: (values) => ipcRenderer.invoke('printer:save', values),
   testPrinter: (values) => ipcRenderer.invoke('printer:test', values),

@@ -73,7 +73,7 @@ Presets live in `src/shared/paper.js` and are derived on save. Dot density (8 do
 
 ## Preview and print use one canonical receipt
 
-The on-screen preview and the ESC/POS print output originate from the same receipt operations (`src/shared/receipt-document.js`) and the same prepared logo bitmap (`src/main/logo-bitmap.js`). Logo size (`RECEIPT_LOGO.widthRatio`, default 70% of printable width) and alignment (center, top) live in `src/shared/receipt-layout.js` — changing them affects both preview and print. Physical output cannot be guaranteed pixel-identical to a browser because browser fonts and printer fonts differ, but both outputs are generated from the same operations and logo bitmap.
+The on-screen preview and the ESC/POS print output originate from the same receipt operations (`src/shared/receipt.js`). All receipt layout — block order, alignment, column widths and the logo image — lives in `src/shared/receipt-template.json`, so it can be edited at the [retail-print-kit designer](https://arka162.github.io/retail-print-kit/designer/) and re-imported without touching source code. Physical output cannot be guaranteed pixel-identical to a browser because browser fonts and printer fonts differ, but both outputs are generated from the same operations.
 
 ## Test print
 
@@ -95,7 +95,7 @@ There is no permanent virtual-printer mode in the production UI.
 
 Real hardware acceptance is still required before releasing LAN or USB support:
 
-- Verify LAN printing over TCP port 9100: paper width, character grid, logo size, logo alignment, text alignment, bolding, cut, and feed.
+- Verify LAN printing over TCP port 9100: paper width, character grid, logo, text alignment, bolding, cut, and feed.
 - Verify USB device discovery and selection, then repeat the physical checks over USB.
 - Verify a Windows print dialog never appears.
 - Verify failed printing leaves the receipt saved with a failed print status.

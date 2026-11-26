@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { formatReceiptDate, formatReceiptTime, groupTrackingNumber } from '../src/shared/dates.js'
+import { formatReceiptDate, formatReceiptTime, groupTrackingNumber } from '../src/shared/receipt.js'
 
 test('formats receipt dates with weekday and US order', () => {
   assert.equal(formatReceiptDate('2026-08-10'), 'Mon 08/10/2026')

@@ -361,7 +361,6 @@ function SavedInvoicesPage({ onEdit }) {
             receipt={viewing.invoice}
             company={viewing.company || {}}
             printer={viewing.printer || {}}
-            logoBitmap={viewing.company?.logoBitmap ?? null}
           />
         )}
       </Modal>

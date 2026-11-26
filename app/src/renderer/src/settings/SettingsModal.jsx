@@ -6,9 +6,7 @@ import CompanyMetadataSection from './CompanyMetadataSection'
 import PrinterSettingsSection from './PrinterSettingsSection'
 
 const defaultCompany = {
-  defaultCurrency: 'USD',
-  logoPath: null,
-  logoDataUrl: null
+  defaultCurrency: 'USD'
 }
 
 const defaultPrinter = {
@@ -82,7 +80,7 @@ function SettingsModal({ opened, onClose }) {
       notifications.show({
         color: 'green',
         title: 'Company settings saved',
-        message: 'Logo and currency saved.'
+        message: 'Currency saved.'
       })
     } catch (saveError) {
       notifications.show({
@@ -137,7 +135,6 @@ function SettingsModal({ opened, onClose }) {
     }
   }
 
-  const handleChooseLogo = () => window.invoiceApi.chooseLogo()
   const handleClose = () => {
     setLoading(true)
     onClose()
@@ -192,7 +189,6 @@ function SettingsModal({ opened, onClose }) {
               key={`company-${refreshKey}`}
               initialData={company}
               onSave={handleCompanySave}
-              onChooseLogo={handleChooseLogo}
               saving={saving}
             />
           ) : (

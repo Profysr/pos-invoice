@@ -4,10 +4,10 @@ import { render as renderMain } from 'retail-print-kit'
 import { render as renderBrowser } from 'retail-print-kit/browser'
 import {
   buildReceiptDocument,
-  buildReceiptPreviewHtml
-} from '../src/shared/receipt-document.js'
-import { RECEIPT_TEMPLATE, buildReceiptViewModel } from '../src/shared/receipt-template-core.js'
-import { RECEIPT_LOGO, logoWidthDots } from '../src/shared/receipt-layout.js'
+  buildReceiptPreviewHtml,
+  RECEIPT_TEMPLATE,
+  buildReceiptViewModel
+} from '../src/shared/receipt.js'
 
 const receipt = {
   invoiceDate: '2026-08-10',
@@ -25,12 +25,6 @@ const receipt = {
 
 const company = { name: 'Example', defaultCurrency: 'USD' }
 const printer = { characterWidth: 42, paperWidthMm: 80, printableWidthMm: 72, dotDensity: 8 }
-
-const logoBitmap = {
-  width: 16,
-  height: 1,
-  data: Buffer.from([0b10100000, 0b01000000]).toString('base64')
-}
 
 function textOps(ops) {
   return ops.filter((op) => op.kind === 'text')
@@ -102,28 +96,19 @@ test('sanitization runs on every text op before output', () => {
   assert.ok(text.includes('A B "C"x7'), 'sanitized line present: ' + JSON.stringify(text.slice(0, 80)))
 })
 
-test('logo ops are init, explicit alignment, then raster with decoded bits', () => {
-  const { ops } = buildReceiptDocument({ receipt, company, printer, logoBitmap })
+test('the template logo renders as init, explicit alignment, then raster ops', () => {
+  const { ops } = buildReceiptDocument({ receipt, company, printer })
   assert.deepEqual(ops[0], { kind: 'init' })
-  assert.deepEqual(ops[1], { kind: 'align', align: RECEIPT_LOGO.align }, 'alignment comes from RECEIPT_LOGO')
+  assert.deepEqual(ops[1], { kind: 'align', align: 'center' }, 'alignment comes from the image block')
   const raster = ops[2]
   assert.equal(raster.kind, 'raster')
-  assert.equal(raster.width, 16)
-  assert.equal(raster.height, 1)
-  assert.deepEqual(raster.bits, new Uint8Array([0b10100000, 0b01000000]), 'base64 bits decoded')
-})
-
-test('no logo bitmap means no raster op', () => {
-  const { ops } = buildReceiptDocument({ receipt, company, printer })
-  assert.equal(
-    ops.some((op) => op.kind === 'raster'),
-    false
-  )
+  assert.equal(raster.width, RECEIPT_TEMPLATE.blocks[0].width, 'width comes from the image block')
+  assert.equal(raster.bits.length, Math.ceil(raster.width / 8) * raster.height, 'decoded bits')
 })
 
 test('the same input produces identical operations every time', () => {
-  const first = buildReceiptDocument({ receipt, company, printer, logoBitmap })
-  const second = buildReceiptDocument({ receipt, company, printer, logoBitmap })
+  const first = buildReceiptDocument({ receipt, company, printer })
+  const second = buildReceiptDocument({ receipt, company, printer })
   assert.deepEqual(first.ops, second.ops, 'ops deterministic')
   assert.deepEqual(first.data, second.data, 'view model deterministic')
   assert.deepEqual(first.profile, second.profile, 'profile deterministic')
@@ -139,19 +124,11 @@ test('browser and main-process renders produce identical operations', () => {
 })
 
 test('preview HTML derives from the same ops as the printer', () => {
-  const { ops, profile } = buildReceiptDocument({ receipt, company, printer, logoBitmap })
+  const { ops, profile } = buildReceiptDocument({ receipt, company, printer })
   const html = buildReceiptPreviewHtml({ ops, profile })
   assert.match(html, /^<!doctype html>/i, 'complete document')
   assert.ok(html.includes('Prepaid Mail'), 'product visible in preview')
   assert.ok(html.includes('font-weight:bold'), 'bold styling carried into preview')
   assert.ok(!html.includes('Prepaid Mail@'), 'marker never reaches preview')
-  assert.ok(html.includes('data:image/png;base64,'), 'logo raster carried into preview')
-})
-
-test('RECEIPT_LOGO defaults and logoWidthDots ratio live in one place', () => {
-  assert.equal(RECEIPT_LOGO.widthRatio, 0.7)
-  assert.equal(RECEIPT_LOGO.align, 'center')
-  assert.equal(RECEIPT_LOGO.position, 'top')
-  assert.equal(logoWidthDots({ printableWidthMm: 72, dotDensity: 8 }), Math.round(72 * 8 * 0.7))
-  assert.equal(logoWidthDots({ printableWidthMm: 50, dotDensity: 8 }), Math.round(50 * 8 * 0.7))
+  assert.ok(html.includes('data:image/png;base64,'), 'template logo carried into preview')
 })

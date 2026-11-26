@@ -207,7 +207,6 @@ function NewInvoiceEditor({ bootstrap, editInvoice = null }) {
             receipt={receipt}
             company={bootstrap.company || {}}
             printer={bootstrap.printer || { characterWidth: 48, paperWidthMm: 80 }}
-            logoBitmap={bootstrap.company?.logoBitmap ?? null}
           />
         </ScrollArea>
       </Flex>
