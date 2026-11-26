@@ -56,6 +56,10 @@
       "type": "line"
     },
     {
+      "type": "newline",
+      "count": 1
+    },
+    {
       "type": "row",
       "cells": [
         {
@@ -113,8 +117,12 @@
       ]
     },
     {
+      "type": "newline",
+      "count": 1
+    },
+    {
       "type": "text",
-      "value": "  {{shipping.destination}}",
+      "value": "{{shipping.destination}}",
       "style": "normal",
       "align": "left"
     },
@@ -194,6 +202,10 @@
     },
     {
       "type": "line"
+    },
+    {
+      "type": "newline",
+      "count": 1
     },
     {
       "type": "row",
