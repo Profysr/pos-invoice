@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import icon from '../../resources/icon.png?asset'
 import { createDatabaseStore, initializeUserData } from './database.js'
 import { encodeReceipt, sendReceipt } from './receipt-printing.js'
-import { createPrinterTransport, sendBytes, listUsbPrinters } from './printer-transport.js'
+import { createPrinterTransport, sendBytes } from './printer-transport.js'
 
 let database
 let paths
@@ -111,17 +111,11 @@ function registerIpcHandlers() {
     }
   })
 
-  ipcMain.handle('company:get', () => companyRecord())
-
-  ipcMain.handle('company:save', (_event, values) => database.saveCompany(values))
-
   ipcMain.handle('printer:get', () => database.getPrinter('default') || defaultPrinter())
 
   ipcMain.handle('printer:save', (_event, values) =>
     database.savePrinter({ ...values, id: 'default' })
   )
-
-  ipcMain.handle('printer:list-usb', async () => listUsbPrinters())
 
   // Runs the same code path as a real print with a short test job, without saving anything. Returns { ok, message } instead of throwing so the notification shows the raw transport error without an IPC prefix.
   ipcMain.handle('printer:test', async (_event, values) => {
@@ -140,8 +134,7 @@ function registerIpcHandlers() {
     }
 
     try {
-      const company = database.getCompany() || defaultCompany()
-      const bytes = await encodeReceipt(testReceipt, company, profile)
+      const bytes = await encodeReceipt(testReceipt, profile)
       const transport = createPrinterTransport(profile)
       await sendBytes(transport, bytes)
       const target =
@@ -188,10 +181,8 @@ function registerIpcHandlers() {
     }
 
     try {
-      const company = database.getCompany() || defaultCompany()
-
       // One direct LAN/USB pipeline for every configured printer.
-      const result = await sendReceipt(saved, company, printer)
+      const result = await sendReceipt(saved, printer)
 
       database.recordPrintResult({
         id: randomUUID(),

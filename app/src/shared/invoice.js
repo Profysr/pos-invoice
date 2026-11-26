@@ -242,7 +242,7 @@ export function makeReceiptData(values) {
 
   const price = isDbInvoice
     ? Number(values.subtotal) || 0
-    : parseMoneyToMinorUnits(values.price, 'Price')
+    : (values.price ? parseMoneyToMinorUnits(values.price, 'Price') : 0)
 
   const service = values.service || values.shippingService || 'Prepaid Mail'
   const item = {

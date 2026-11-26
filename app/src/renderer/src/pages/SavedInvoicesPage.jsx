@@ -27,6 +27,7 @@ import {
 } from '@tabler/icons-react'
 import {
   formatMoney,
+  makeReceiptData,
   normalizeShippingReceiptDraft,
   storedShippingReceiptToDraft
 } from '../../../shared/invoice.js'
@@ -117,12 +118,11 @@ function SavedInvoicesPage({ onEdit }) {
   }
 
   const handleView = guard(async (row) => {
-    const [invoice, company, printer] = await Promise.all([
+    const [invoice, printer] = await Promise.all([
       window.invoiceApi.getInvoice(row.id),
-      window.invoiceApi.getCompany(),
       window.invoiceApi.getPrinter()
     ])
-    setViewing({ invoice, company, printer })
+    setViewing({ invoice, printer })
   })
 
   const handleEdit = guard(async (row) => {
@@ -358,8 +358,7 @@ function SavedInvoicesPage({ onEdit }) {
       >
         {viewing && (
           <ReceiptPreview
-            receipt={viewing.invoice}
-            company={viewing.company || {}}
+            receiptData={makeReceiptData(viewing.invoice)}
             printer={viewing.printer || {}}
           />
         )}

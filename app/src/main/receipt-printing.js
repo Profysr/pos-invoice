@@ -25,7 +25,7 @@ export async function encodeReceipt(receiptData, printer) {
  *
  * @returns {Promise<{ ok, bytes, message }>}
  */
-export async function sendReceipt(receipt, company, printer) {
+export async function sendReceipt(receipt, printer) {
   const receiptData = makeReceiptData(receipt)
   const bytes = await encodeReceipt(receiptData, printer)
   const transport = createPrinterTransport(printer)

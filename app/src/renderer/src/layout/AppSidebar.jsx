@@ -8,11 +8,11 @@ const navItems = [
   { id: 'settings', label: 'Settings', icon: IconSettings }
 ]
 
-function AppSidebar({ activeView, onNavigate, onOpenSettings }) {
+function AppSidebar({ activeView, onNavigate, onOpenSettings, collapsed = true }) {
   const [hovered, setHovered] = useState(null)
 
   return (
-    <aside className="app-sidebar">
+    <aside className={`app-sidebar${collapsed ? ' app-sidebar-collapsed' : ''}`}>
       <nav className="app-sidebar-nav" aria-label="Main navigation">
         {navItems.map(({ id, label, icon: Icon }) => {
           const isActive = id !== 'settings' && activeView === id
@@ -20,7 +20,7 @@ function AppSidebar({ activeView, onNavigate, onOpenSettings }) {
           return (
             <NavLink
               key={id}
-              label={label}
+              label={collapsed ? undefined : label}
               leftSection={<Icon size={17} stroke={1.6} />}
               active={isActive}
               onClick={() => {
@@ -34,11 +34,13 @@ function AppSidebar({ activeView, onNavigate, onOpenSettings }) {
                 borderRadius: theme.radius.sm,
                 color: isHighlighted ? theme.colors.accent[6] : theme.colors.dark[7],
                 background: isActive ? theme.colors.accent[0] : undefined,
-                fontWeight: isActive ? 600 : 400
+                fontWeight: isActive ? 600 : 400,
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                padding: collapsed ? '7px' : '7px 10px'
               })}
               styles={{
-                root: { padding: '7px 10px' },
-                label: { fontSize: '0.85rem' }
+                root: { padding: collapsed ? '7px' : '7px 10px' },
+                label: { fontSize: '0.85rem', display: collapsed ? 'none' : 'block' }
               }}
             />
           )

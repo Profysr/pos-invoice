@@ -167,7 +167,7 @@ test('sendReceipt prints to a controlled TCP server exactly once', async (t) => 
   t.after(() => new Promise((resolve) => server.close(resolve)))
   const { port } = server.address()
 
-  const result = await sendReceipt(receipt, company, lanPrinter({ networkPort: port }))
+  const result = await sendReceipt(receipt, lanPrinter({ networkPort: port }))
 
   await Promise.race([
     closed,
