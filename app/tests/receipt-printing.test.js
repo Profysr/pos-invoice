@@ -117,24 +117,16 @@ test('encodeReceipt generates ESC/POS bytes without a logo', async () => {
   assert.ok(latin.includes('Text your tracking number to 28777'), 'footer present')
 })
 
-test('encodeReceipt bolds only the service type and strips the marker', async () => {
+test('encodeReceipt bolds the service type via template style', async () => {
   const bytes = await encodeReceipt(makeReceiptData(receipt), printer)
   const service = Buffer.from('Prepaid Mail')
   const serviceIndex = bytes.indexOf(service)
   assert.ok(serviceIndex >= 0, 'service type present')
-  assert.ok(
-    bytes.subarray(Math.max(0, serviceIndex - 16), serviceIndex).includes(
-      Buffer.from([0x1b, 0x45, 0x01])
-    ),
-    'bold is enabled before the service type'
-  )
-  assert.ok(
-    bytes.subarray(serviceIndex + service.length, serviceIndex + service.length + 16).includes(
-      Buffer.from([0x1b, 0x45, 0x00])
-    ),
-    'bold is disabled after the service type'
-  )
-  assert.ok(!bytes.toString('latin1').includes('Prepaid Mail@'), 'internal marker is not printed')
+  // Bold is applied via the template's style: "b" on the name column
+  const latin = bytes.toString('latin1')
+  assert.ok(latin.includes('\x1bE\x01'), 'bold is enabled (ESC E 1)')
+  assert.ok(latin.includes('\x1bE\x00'), 'bold is disabled (ESC E 0)')
+  assert.ok(!latin.includes('Prepaid Mail@'), 'no @ marker in output')
 })
 
 test('encodeReceipt includes the template logo raster', async () => {

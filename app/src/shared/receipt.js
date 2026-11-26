@@ -89,9 +89,6 @@ export function buildReceiptDocument({ receiptData, printer }) {
   const profile = buildPrinterProfile(printer)
   let ops = render(RECEIPT_TEMPLATE, receiptData, profile)
 
-  // Replace the internal product-name marker (@) with bold style operations.
-  ops = boldItemNamesInOps(ops, receiptData.items)
-
   // ESC @ initialization at the start.
   ops.unshift({ kind: 'init' })
 
@@ -140,36 +137,6 @@ function sanitizeReceiptText(value) {
       return code >= 32 && code !== 127
     })
     .join('')
-}
-
-/**
- * Replace the internal product-name marker (`Product@`) with bold style operations,
- * mirroring the existing print path so preview and print bold the same text.
- */
-function boldItemNamesInOps(ops, items) {
-  const result = [...ops]
-  let searchFrom = 0
-  for (const item of items) {
-    const product = String(item?.name ?? item?.product ?? '')
-    if (!product) continue
-    const markedProduct = `${product}@`
-    const index = result.findIndex(
-      (op, opIndex) =>
-        opIndex >= searchFrom && op.kind === 'text' && op.text.includes(markedProduct)
-    )
-    if (index < 0) continue
-    const remainder = result[index].text.slice(markedProduct.length)
-    result.splice(
-      index,
-      1,
-      { kind: 'style', style: { bold: true, underline: 0 } },
-      { kind: 'text', text: product },
-      { kind: 'style', style: { bold: false, underline: 0 } },
-      { kind: 'text', text: remainder }
-    )
-    searchFrom = index + 4
-  }
-  return result
 }
 
 /**

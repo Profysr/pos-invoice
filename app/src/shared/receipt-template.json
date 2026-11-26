@@ -91,7 +91,7 @@
       "rows": "items",
       "columns": [
         {
-          "value": "{{name}}@",
+          "value": "{{name}}",
           "width": 0.5,
           "style": "b"
         },
@@ -114,7 +114,7 @@
     },
     {
       "type": "text",
-      "value": "{{shipping.destination}}",
+      "value": "  {{shipping.destination}}",
       "style": "normal",
       "align": "left"
     },
