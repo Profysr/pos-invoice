@@ -62,7 +62,7 @@ test('date and time render on one row: date left, time right', () => {
   const dateTimeIndex = text.findIndex((t) => t.includes('8/10/2026'))
   assert.ok(dateTimeIndex >= 0, 'date/time row present')
   const row = text[dateTimeIndex]
-  assert.ok(row.startsWith('8/10/2026'), 'date starts the row: ' + JSON.stringify(row))
+  assert.ok(row.startsWith('Mon 08/10/2026'), 'date starts the row: ' + JSON.stringify(row))
   assert.ok(row.endsWith('6:06 PM') || row.endsWith('18:06'), 'time ends the row: ' + JSON.stringify(row))
 })
 

@@ -33,7 +33,7 @@
       "type": "row",
       "cells": [
         {
-          "value": "{{date | date:datetime}}",
+          "value": "{{date}}",
           "width": 0.7
         },
         {
@@ -125,7 +125,7 @@
     },
     {
       "type": "text",
-      "value": "       {{shipping.expectedDelivery | date}}",
+      "value": "       {{shipping.expectedDelivery}}",
       "align": "left"
     },
     {

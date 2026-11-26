@@ -1,7 +1,11 @@
 import { render, opsToHtml, profiles } from 'retail-print-kit/browser'
-import { groupTrackingNumber } from './invoice.js'
+import {
+  formatReceiptDate,
+  formatReceiptTime,
+  groupTrackingNumber
+} from './invoice.js'
 
-export { groupTrackingNumber }
+export { formatReceiptDate, formatReceiptTime, groupTrackingNumber }
 
 /**
  * The receipt template lives in receipt-template.json next to this module
@@ -15,36 +19,6 @@ export { groupTrackingNumber }
  */
 import RECEIPT_TEMPLATE from './receipt-template.json' with { type: 'json' }
 export { RECEIPT_TEMPLATE }
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-// Parse "yyyy-mm-dd" without the UTC shift that new Date('2026-11-10') causes.
-function parseLocalDate(value) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? '').trim())
-  if (!match) return null
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
-// "2026-08-10" -> "Mon 08/10/2026"
-export function formatReceiptDate(value) {
-  const date = parseLocalDate(value)
-  if (!date) return ''
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${WEEKDAYS[date.getDay()]} ${month}/${day}/${date.getFullYear()}`
-}
-
-// "18:06" -> "6:06 PM"
-export function formatReceiptTime(value) {
-  const match = /^(\d{1,2}):(\d{2})/.exec(String(value ?? '').trim())
-  if (!match) return ''
-  const hours = Number(match[1])
-  if (hours > 23) return ''
-  const suffix = hours >= 12 ? 'PM' : 'AM'
-  const hour12 = hours % 12 === 0 ? 12 : hours % 12
-  return `${hour12}:${match[2]} ${suffix}`
-}
 
 // Break text into lines of at most `width` characters, honoring hard breaks.
 export function wrapText(input, width) {

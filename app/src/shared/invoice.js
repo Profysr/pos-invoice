@@ -45,6 +45,36 @@ export function groupTrackingNumber(value) {
   return text.replace(/(\d{4})(?=\d)/g, '$1 ');
 }
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// Parse "yyyy-mm-dd" without the UTC shift that new Date('2026-11-10') causes.
+function parseLocalDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? '').trim());
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+// "2026-08-10" -> "Mon 08/10/2026"
+export function formatReceiptDate(value) {
+  const date = parseLocalDate(value);
+  if (!date) return '';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${WEEKDAYS[date.getDay()]} ${month}/${day}/${date.getFullYear()}`;
+}
+
+// "18:06" -> "6:06 PM"
+export function formatReceiptTime(value) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(value ?? '').trim());
+  if (!match) return '';
+  const hours = Number(match[1]);
+  if (hours > 23) return '';
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${hour12}:${match[2]} ${suffix}`;
+}
+
 export function formatMoney(minorUnits, currency = 'USD', locale = 'en-US') {
   const safeCurrency = /^[A-Z]{3}$/.test(currency) ? currency : 'USD'
   try {
@@ -173,9 +203,11 @@ export function normalizeShippingReceiptDraft(values, id) {
  *
  * Money is kept as integer minor units (the database representation) and
  * formatted only by the template's `money:$` filter at render time.
- * Dates are passed as raw ISO strings; the template's `date` filter handles
- * display formatting. Tracking numbers are grouped here because no template
- * filter exists for that.
+ * Dates and times are pre-formatted here (not by the template's locale-dependent
+ * `date` filter) so preview and printing show identical, stable values:
+ *   - date: "Mon 08/10/2026"
+ *   - time: "6:06 PM"
+ * Tracking numbers are grouped here because no template filter exists for that.
  *
  * @param {object} values - raw Mantine form values or DB-shaped invoice
  * @returns {object} template-ready data object
@@ -229,12 +261,12 @@ export function makeReceiptData(values) {
       zip: values.senderZip || '',
       contact: senderContact
     },
-    date: isDbInvoice ? values.invoiceDate : (values.date || ''),
-    time: isDbInvoice ? values.invoiceTime : (values.time || ''),
+    date: formatReceiptDate(isDbInvoice ? values.invoiceDate : (values.date || '')),
+    time: formatReceiptTime(isDbInvoice ? values.invoiceTime : (values.time || '')),
     items: [item],
     shipping: {
       destination: destinationAddress,
-      expectedDelivery: values.expectedDeliveryDate || '',
+      expectedDelivery: formatReceiptDate(values.expectedDeliveryDate || ''),
       trackingNumber: groupTrackingNumber(values.trackingNumber || '')
     },
     total: price / 100,
