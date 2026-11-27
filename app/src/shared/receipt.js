@@ -20,42 +20,6 @@ export { formatReceiptDate, formatReceiptTime, groupTrackingNumber }
 import RECEIPT_TEMPLATE from './receipt-template.json' with { type: 'json' }
 export { RECEIPT_TEMPLATE }
 
-// Break text into lines of at most `width` characters, honoring hard breaks.
-export function wrapText(input, width) {
-  const safeWidth = Math.max(1, Number(width) || 48)
-  return String(input ?? '')
-    .split('\n')
-    .flatMap((paragraph) => {
-      const words = paragraph.trim().split(/\s+/).filter(Boolean)
-      if (words.length === 0) return ['']
-
-      const lines = []
-      let line = ''
-      for (const word of words) {
-        if (word.length > safeWidth) {
-          if (line) lines.push(line)
-          line = ''
-          for (let index = 0; index < word.length; index += safeWidth) {
-            lines.push(word.slice(index, index + safeWidth))
-          }
-          continue
-        }
-        if (!line) {
-          line = word
-          continue
-        }
-        if (`${line} ${word}`.length <= safeWidth) {
-          line += ` ${word}`
-          continue
-        }
-        lines.push(line)
-        line = word
-      }
-      if (line) lines.push(line)
-      return lines
-    })
-}
-
 /**
  * Build the printer profile from a printer profile row.
  * MVP: 80 mm paper only, LAN printing only.
@@ -100,9 +64,9 @@ export function buildReceiptDocument({ receiptData, printer }) {
   }
 
   // End the document with a cut even if the template's own cut block is removed.
-  if (ops.at(-1)?.kind !== 'cut') {
-    ops.push({ kind: 'cut', partial: false, feed: 3 })
-  }
+  // if (ops.at(-1)?.kind !== 'cut') {
+  //   ops.push({ kind: 'cut', partial: false, feed: 3 })
+  // }
 
   return { data: receiptData, profile, ops }
 }
@@ -134,7 +98,8 @@ function sanitizeReceiptText(value) {
     .split('')
     .filter((character) => {
       const code = character.charCodeAt(0)
-      return code >= 32 && code !== 127
+      // Keep newline/carriage-return (10/13) so opsToHtml can flush lines. Everything below 32 is a control character printers choke on.
+      return code >= 32 || code === 10 || code === 13
     })
     .join('')
 }

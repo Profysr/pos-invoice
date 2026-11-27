@@ -235,9 +235,18 @@ export function makeReceiptData(values) {
         .filter(Boolean)
         .join(' ')
 
-  const price = isDbInvoice
-    ? Number(values.subtotal) || 0
-    : (values.price ? parseMoneyToMinorUnits(values.price, 'Price') : 0)
+  let price = 0
+  if (isDbInvoice) {
+    price = Number(values.subtotal) || 0
+  } else if (values.price) {
+    try {
+      price = parseMoneyToMinorUnits(values.price, 'Price')
+    } catch {
+      // Invalid price while typing — form validation will surface the error.
+      // Default to 0 so render doesn't crash; preview shows $0.00 until fixed.
+      price = 0
+    }
+  }
 
   const service = values.service || values.shippingService || 'Prepaid Mail'
   const item = {
