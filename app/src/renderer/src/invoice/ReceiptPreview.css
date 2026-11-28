@@ -1,50 +1,36 @@
-/* Thermal receipt preview — the only custom CSS in the invoice/ folder. */
-
+/* Thermal receipt preview — frames the canonical HTML rendered inside an
+   isolated iframe. All receipt layout lives inside the iframe (from the
+   canonical operations), so this sheet only frames the preview and errors. */
 .receipt-preview-area {
   display: flex;
   justify-content: center;
   align-items: flex-start;
   padding: 16px 12px;
-  background: #f4f5f7;
-  border: 1px solid #e5e7eb;
-  border-radius: 5px;
+  background: var(--mantine-color-gray-0);
+  border: 1px solid var(--mantine-color-gray-2);
+  border-radius: var(--mantine-radius-sm);
   min-height: 200px;
   height: 100%;
   overflow: auto;
 }
 
-.receipt-paper {
-  flex-shrink: 0;
-  background: #ffffff;
-  box-shadow: 0 1px 4px rgba(31, 41, 55, 0.18);
-  padding: 12px 8px;
-  font-family: 'Consolas', 'Courier New', 'DejaVu Sans Mono', monospace;
-  font-size: 11px;
-  line-height: 1.45;
-  color: #1f2937;
-  word-break: break-word;
+.receipt-preview-frame {
+  display: block;
+  border: none;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(31, 41, 55, 0.16);
 }
 
-.receipt-line {
-  white-space: pre-wrap;
+/* Ensure the preview area scrolls when a receipt is taller than the viewport. */
+.receipt-preview-area {
+  overflow: auto;
 }
 
-.receipt-line.align-left {
-  text-align: left;
-}
-
-.receipt-line.align-center {
-  text-align: center;
-}
-
-.receipt-line.align-right {
-  text-align: right;
-}
-
-.receipt-line.bold {
-  font-weight: 700;
-}
-
-.receipt-line.receipt-gap {
-  height: 0.7em;
+.receipt-error {
+  width: 100%;
+  padding: 12px;
+  color: var(--mantine-color-red-7);
+  background: var(--mantine-color-red-0);
+  border: 1px solid var(--mantine-color-red-2);
+  border-radius: var(--mantine-radius-sm);
 }

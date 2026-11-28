@@ -1,18 +1,15 @@
-// Single source of truth for all Mantine design tokens.
-// Do not introduce a second styling system — reference these tokens everywhere.
 import { createTheme } from '@mantine/core'
 
-// Declarative design tokens (shared design direction: plain solid colors,
-// white panels, light neutral background, charcoal text, subtle grey borders,
-// one restrained accent for primary actions, compact controls, 5px radius).
 export const tokens = {
   accent: '#2563eb',
   accentHover: '#1d4ed8',
   text: '#1f2937',
   textDimmed: '#6b7280',
-  background: '#f4f5f7',
-  panel: '#ffffff',
-  border: '#e5e7eb',
+  background: '#f8f9fa',
+  panel: '#f4f4f4',
+  border: '#eee',
+  danger: '#c92a2a',
+  success: '#2b8a3e',
   radius: 5
 }
 
@@ -22,16 +19,16 @@ const theme = createTheme({
   primaryShade: 6,
   colors: {
     accent: [
-      '#eff4ff',
-      '#dde7fe',
-      '#c2d3fd',
-      '#9bb9fb',
-      '#6f97f8',
-      '#527ef5',
+      '#eff6ff',
+      '#dbeafe',
+      '#bfdbfe',
+      '#93c5fd',
+      '#60a5fa',
+      '#3b82f6',
       tokens.accent,
-      '#2563eb',
-      '#1d4ed8',
-      '#1e3fae'
+      tokens.accentHover,
+      '#1e40af',
+      '#1e3a8a'
     ]
   },
   white: tokens.panel,
@@ -61,10 +58,11 @@ const theme = createTheme({
     Select: { defaultProps: { size: 'sm' } },
     Textarea: { defaultProps: { size: 'sm' } },
     Checkbox: { defaultProps: { size: 'sm' } },
+    Switch: { defaultProps: { size: 'sm' } },
     SegmentedControl: { defaultProps: { size: 'sm' } },
     ActionIcon: { defaultProps: { size: 'sm' } },
     Modal: {
-      defaultProps: { size: 560, centered: true, overlayProps: { opacity: 0.4 } }
+      defaultProps: { size: 560, centered: true, overlayProps: { opacity: 0.45 } }
     },
     Table: { defaultProps: { highlightOnHover: false, verticalSpacing: 'xs' } },
     Paper: { defaultProps: { radius: tokens.radius } }

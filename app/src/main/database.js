@@ -2,6 +2,16 @@ import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
+const DEFAULT_PAGE_SIZE = 15
+const INVOICE_PRINT_STATUSES = ['not_printed', 'queued', 'printing', 'succeeded', 'failed']
+const INVOICE_PRINT_TRANSITIONS = {
+  not_printed: ['queued', 'printing'],
+  queued: ['printing', 'failed'],
+  printing: ['succeeded', 'failed'],
+  succeeded: ['printing'],
+  failed: ['printing']
+}
+
 const migrations = [
   {
     version: 1,
@@ -15,7 +25,6 @@ const migrations = [
       CREATE TABLE company_metadata (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         name TEXT NOT NULL,
-        address TEXT NOT NULL DEFAULT '',
         phone TEXT NOT NULL DEFAULT '',
         email TEXT NOT NULL DEFAULT '',
         default_currency TEXT NOT NULL DEFAULT 'USD',
@@ -56,10 +65,18 @@ const migrations = [
         insurance INTEGER NOT NULL DEFAULT 0 CHECK (insurance >= 0),
         total INTEGER NOT NULL DEFAULT 0 CHECK (total >= 0),
         shipping_service TEXT NOT NULL DEFAULT '',
-        destination_address TEXT NOT NULL DEFAULT '',
+        destination_city TEXT NOT NULL DEFAULT '',
+        destination_state TEXT NOT NULL DEFAULT '',
+        destination_zip TEXT NOT NULL DEFAULT '',
         package_weight TEXT NOT NULL DEFAULT '',
         expected_delivery_date TEXT,
         tracking_number TEXT NOT NULL DEFAULT '',
+        sender_name TEXT NOT NULL DEFAULT '',
+        sender_street TEXT NOT NULL DEFAULT '',
+        sender_city TEXT NOT NULL DEFAULT '',
+        sender_state TEXT NOT NULL DEFAULT '',
+        sender_zip TEXT NOT NULL DEFAULT '',
+        sender_contact TEXT NOT NULL DEFAULT '',
         notes TEXT NOT NULL DEFAULT '',
         print_status TEXT NOT NULL DEFAULT 'not_printed'
           CHECK (print_status IN ('not_printed', 'queued', 'printing', 'succeeded', 'failed')),
@@ -93,6 +110,100 @@ const migrations = [
       CREATE INDEX invoice_items_invoice_id_idx ON invoice_items(invoice_id);
       CREATE INDEX print_history_invoice_id_idx ON print_history(invoice_id);
     `
+  },
+  {
+    version: 2,
+    sql: `
+      ALTER TABLE invoices ADD COLUMN insurance_label TEXT NOT NULL DEFAULT '';
+      ALTER TABLE printer_profiles ADD COLUMN dot_density REAL NOT NULL DEFAULT 8;
+
+      -- The shipping receipt is the only template now, so the old invoice rows go.
+      DELETE FROM invoice_items;
+      DELETE FROM print_history;
+      DELETE FROM invoices;
+    `
+  },
+  {
+    version: 3,
+    sql: `
+      CREATE TABLE company_metadata_v3 (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        default_currency TEXT NOT NULL DEFAULT 'USD',
+        logo_path TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      INSERT INTO company_metadata_v3 (id, default_currency, logo_path, created_at, updated_at)
+      SELECT id, default_currency, logo_path, created_at, updated_at
+      FROM company_metadata;
+
+      DROP TABLE company_metadata;
+      ALTER TABLE company_metadata_v3 RENAME TO company_metadata;
+    `
+  },
+  {
+    version: 4,
+    sql: `
+      -- Widen printer profile connection types to allow USB alongside the legacy
+      -- system/network options, and persist USB vendor/product IDs. Existing
+      -- rows (including legacy 'system' printers) are copied across unchanged.
+      ALTER TABLE printer_profiles ADD COLUMN usb_vendor_id INTEGER;
+      ALTER TABLE printer_profiles ADD COLUMN usb_product_id INTEGER;
+
+      CREATE TABLE printer_profiles_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        connection_type TEXT NOT NULL CHECK (connection_type IN ('network', 'system', 'usb')),
+        network_host TEXT,
+        network_port INTEGER CHECK (network_port BETWEEN 1 AND 65535),
+        system_printer_name TEXT,
+        usb_vendor_id INTEGER,
+        usb_product_id INTEGER,
+        paper_width_mm REAL NOT NULL,
+        printable_width_mm REAL NOT NULL,
+        character_width INTEGER NOT NULL,
+        encoding TEXT NOT NULL DEFAULT 'CP437',
+        cut_after_print INTEGER NOT NULL DEFAULT 1 CHECK (cut_after_print IN (0, 1)),
+        feed_lines_after_print INTEGER NOT NULL DEFAULT 0 CHECK (feed_lines_after_print >= 0),
+        timeout_ms INTEGER NOT NULL DEFAULT 5000 CHECK (timeout_ms >= 100),
+        dot_density REAL NOT NULL DEFAULT 8,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      INSERT INTO printer_profiles_new
+        (id, name, connection_type, network_host, network_port, system_printer_name,
+         usb_vendor_id, usb_product_id,
+         paper_width_mm, printable_width_mm, character_width, dot_density, encoding,
+         cut_after_print, feed_lines_after_print, timeout_ms, created_at, updated_at)
+      SELECT
+        id, name, connection_type, network_host, network_port, system_printer_name,
+        NULL, NULL,
+        paper_width_mm, printable_width_mm, character_width, dot_density, encoding,
+        cut_after_print, feed_lines_after_print, timeout_ms, created_at, updated_at
+      FROM printer_profiles;
+
+      DROP TABLE printer_profiles;
+      ALTER TABLE printer_profiles_new RENAME TO printer_profiles;
+
+      -- Widen print history connection method to allow USB while preserving legacy 'system' rows.
+      CREATE TABLE print_history_new (
+        id TEXT PRIMARY KEY,
+        invoice_id TEXT REFERENCES invoices(id) ON DELETE SET NULL,
+        printer_id TEXT,
+        printer_name TEXT NOT NULL,
+        connection_method TEXT NOT NULL CHECK (connection_method IN ('network', 'system', 'usb')),
+        status TEXT NOT NULL CHECK (status IN ('succeeded', 'failed')),
+        error_message TEXT,
+        printed_at TEXT NOT NULL
+      );
+
+      INSERT INTO print_history_new SELECT * FROM print_history;
+      DROP TABLE print_history;
+      ALTER TABLE print_history_new RENAME TO print_history;
+      CREATE INDEX print_history_invoice_id_idx ON print_history(invoice_id);
+    `
   }
 ]
 
@@ -107,11 +218,49 @@ function requiredText(value, field) {
   return value.trim()
 }
 
+function updateInvoicePrintStatus(
+  database,
+  invoiceId,
+  status,
+  timestamp = now(),
+  requiredStatus = null
+) {
+  if (!INVOICE_PRINT_STATUSES.includes(status)) {
+    throw new Error('Invalid invoice print status')
+  }
+
+  const current = database
+    .prepare('SELECT print_status FROM invoices WHERE id = ?')
+    .get(invoiceId)?.print_status
+  if (!current) return false
+  if (requiredStatus && current !== requiredStatus) {
+    throw new Error(`Invoice must be ${requiredStatus} to record a print result`)
+  }
+  if (current !== status && !INVOICE_PRINT_TRANSITIONS[current]?.includes(status)) {
+    throw new Error(`Invalid invoice print status transition: ${current} -> ${status}`)
+  }
+
+  return (
+    database
+      .prepare(
+        `UPDATE invoices SET print_status = ?, updated_at = ?
+         WHERE id = ? AND print_status = ?`
+      )
+      .run(status, timestamp, invoiceId, current).changes > 0
+  )
+}
+
 function optionalText(value, field) {
   if (value == null) return ''
   if (typeof value !== 'string') throw new Error(`${field} must be text`)
   return value.trim()
 }
+
+// ISO 4217 codes known to the runtime (ICU); no extra dependency needed.
+const ISO_4217 =
+  typeof Intl.supportedValuesOf === 'function'
+    ? new Set(Intl.supportedValuesOf('currency'))
+    : new Set()
 
 function nonNegativeInteger(value, field) {
   if (!Number.isSafeInteger(value) || value < 0) {
@@ -187,12 +336,7 @@ export function openDatabase(databasePath) {
 function mapCompany(row) {
   if (!row) return null
   return {
-    name: row.name,
-    address: row.address,
-    phone: row.phone,
-    email: row.email,
     defaultCurrency: row.default_currency,
-    logoPath: row.logo_path,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }
@@ -207,9 +351,12 @@ function mapPrinter(row) {
     networkHost: row.network_host,
     networkPort: row.network_port,
     systemPrinterName: row.system_printer_name,
+    usbVendorId: row.usb_vendor_id,
+    usbProductId: row.usb_product_id,
     paperWidthMm: row.paper_width_mm,
     printableWidthMm: row.printable_width_mm,
     characterWidth: row.character_width,
+    dotDensity: row.dot_density ?? 8,
     encoding: row.encoding,
     cutAfterPrint: Boolean(row.cut_after_print),
     feedLinesAfterPrint: row.feed_lines_after_print,
@@ -221,6 +368,22 @@ function mapPrinter(row) {
 
 function mapInvoice(row, items = []) {
   if (!row) return null
+  const destinationAddress = [
+    row.destination_city,
+    [row.destination_state, row.destination_zip].filter(Boolean).join(' ')
+  ]
+    .filter(Boolean)
+    .join(', ')
+  const shippingFrom = [
+    row.sender_name,
+    row.sender_street,
+    row.sender_city,
+    [row.sender_state, row.sender_zip].filter(Boolean).join(' '),
+    row.sender_contact
+  ]
+    .filter(Boolean)
+    .join('\n')
+
   return {
     id: row.id,
     invoiceNumber: row.invoice_number,
@@ -235,10 +398,21 @@ function mapInvoice(row, items = []) {
     insurance: row.insurance,
     total: row.total,
     shippingService: row.shipping_service,
-    destinationAddress: row.destination_address,
+    destinationCity: row.destination_city,
+    destinationState: row.destination_state,
+    destinationZip: row.destination_zip,
+    destinationAddress,
     packageWeight: row.package_weight,
     expectedDeliveryDate: row.expected_delivery_date,
     trackingNumber: row.tracking_number,
+    senderName: row.sender_name,
+    senderStreet: row.sender_street,
+    senderCity: row.sender_city,
+    senderState: row.sender_state,
+    senderZip: row.sender_zip,
+    senderContact: row.sender_contact,
+    shippingFrom,
+    insuranceLabel: row.insurance_label || '',
     notes: row.notes,
     printStatus: row.print_status,
     createdAt: row.created_at,
@@ -279,45 +453,40 @@ export function createDatabaseStore(databasePath) {
         .run(key, value, now())
     },
 
+    nextInvoiceNumber() {
+      const year = new Date().getFullYear()
+      const key = `invoiceNumberSequence:${year}`
+      const next = Number(store.getSetting(key) || 0) + 1
+      store.setSetting(key, String(next))
+      return `INV-${year}-${String(next).padStart(4, '0')}`
+    },
+
     getCompany() {
       return mapCompany(database.prepare('SELECT * FROM company_metadata WHERE id = 1').get())
     },
 
     saveCompany(input) {
-      const name = requiredText(input?.name, 'Company name')
-      const address = optionalText(input?.address, 'Company address')
-      const phone = optionalText(input?.phone, 'Company phone')
-      const email = optionalText(input?.email, 'Company email')
       const defaultCurrency = requiredText(input?.defaultCurrency, 'Default currency').toUpperCase()
-      if (defaultCurrency.length !== 3) throw new Error('Default currency must have three letters')
-      const logoPath = input?.logoPath ? optionalText(input.logoPath, 'Logo path') : null
+      const unknownCurrency =
+        ISO_4217.size > 0 ? !ISO_4217.has(defaultCurrency) : !/^[A-Z]{3}$/.test(defaultCurrency)
+      if (unknownCurrency) {
+        throw new Error(`${defaultCurrency} is not a valid ISO 4217 currency code`)
+      }
       const timestamp = now()
       const existing = store.getCompany()
 
+      // created_at is set on first insert only; the UPDATE below never touches
+      // it, so the original creation time survives every update.
       database
         .prepare(
           `INSERT INTO company_metadata
-             (id, name, address, phone, email, default_currency, logo_path, created_at, updated_at)
-           VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+             (id, default_currency, created_at, updated_at)
+           VALUES (1, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
-             name = excluded.name,
-             address = excluded.address,
-             phone = excluded.phone,
-             email = excluded.email,
              default_currency = excluded.default_currency,
-             logo_path = excluded.logo_path,
              updated_at = excluded.updated_at`
         )
-        .run(
-          name,
-          address,
-          phone,
-          email,
-          defaultCurrency,
-          logoPath,
-          existing?.createdAt ?? timestamp,
-          timestamp
-        )
+        .run(defaultCurrency, existing?.createdAt ?? timestamp, timestamp)
 
       return store.getCompany()
     },
@@ -337,24 +506,34 @@ export function createDatabaseStore(databasePath) {
       const id = requiredText(input?.id, 'Printer id')
       const name = requiredText(input?.name, 'Printer name')
       const connectionType = requiredText(input?.connectionType, 'Printer connection type')
-      if (!['network', 'system'].includes(connectionType)) {
-        throw new Error('Printer connection type must be network or system')
+      if (!['network', 'usb'].includes(connectionType)) {
+        throw new Error('Printer connection type must be network or usb')
       }
       const networkHost = optionalText(input?.networkHost, 'Network host')
       const networkPort = input?.networkPort ?? 9100
-      const systemPrinterName = optionalText(input?.systemPrinterName, 'System printer name')
+      const usbVendorId = input?.usbVendorId == null ? null : Number(input.usbVendorId)
+      const usbProductId = input?.usbProductId == null ? null : Number(input.usbProductId)
       if (connectionType === 'network' && !networkHost) {
         throw new Error('Network host is required')
       }
-      if (connectionType === 'system' && !systemPrinterName) {
-        throw new Error('System printer name is required')
-      }
-      if (!Number.isInteger(networkPort) || networkPort < 1 || networkPort > 65535) {
+      if (connectionType === 'network' && (!Number.isInteger(networkPort) || networkPort < 1 || networkPort > 65535)) {
         throw new Error('Network port must be between 1 and 65535')
+      }
+      if (connectionType === 'usb') {
+        if (!Number.isInteger(usbVendorId) || usbVendorId <= 0) {
+          throw new Error('USB vendor ID is required')
+        }
+        if (!Number.isInteger(usbProductId) || usbProductId <= 0) {
+          throw new Error('USB product ID is required')
+        }
       }
       const paperWidthMm = positiveNumber(input?.paperWidthMm, 'Paper width')
       const printableWidthMm = positiveNumber(input?.printableWidthMm, 'Printable width')
       const characterWidth = positiveInteger(input?.characterWidth, 'Character width')
+      const dotDensity = Number(input?.dotDensity) || 8
+      if (dotDensity < 4 || dotDensity > 16) {
+        throw new Error('Dot density must be between 4 and 16 dots per millimetre')
+      }
       const encoding = requiredText(input?.encoding ?? 'CP437', 'Printer encoding')
       const cutAfterPrint = input?.cutAfterPrint ?? true
       const feedLinesAfterPrint = input?.feedLinesAfterPrint ?? 0
@@ -374,18 +553,22 @@ export function createDatabaseStore(databasePath) {
         .prepare(
           `INSERT INTO printer_profiles
              (id, name, connection_type, network_host, network_port, system_printer_name,
-              paper_width_mm, printable_width_mm, character_width, encoding, cut_after_print,
-              feed_lines_after_print, timeout_ms, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              usb_vendor_id, usb_product_id,
+              paper_width_mm, printable_width_mm, character_width, dot_density, encoding,
+              cut_after_print, feed_lines_after_print, timeout_ms, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              name = excluded.name,
              connection_type = excluded.connection_type,
              network_host = excluded.network_host,
              network_port = excluded.network_port,
              system_printer_name = excluded.system_printer_name,
+             usb_vendor_id = excluded.usb_vendor_id,
+             usb_product_id = excluded.usb_product_id,
              paper_width_mm = excluded.paper_width_mm,
              printable_width_mm = excluded.printable_width_mm,
              character_width = excluded.character_width,
+             dot_density = excluded.dot_density,
              encoding = excluded.encoding,
              cut_after_print = excluded.cut_after_print,
              feed_lines_after_print = excluded.feed_lines_after_print,
@@ -398,10 +581,13 @@ export function createDatabaseStore(databasePath) {
           connectionType,
           connectionType === 'network' ? networkHost : null,
           connectionType === 'network' ? networkPort : null,
-          connectionType === 'system' ? systemPrinterName : null,
+          null,
+          connectionType === 'usb' ? usbVendorId : null,
+          connectionType === 'usb' ? usbProductId : null,
           paperWidthMm,
           printableWidthMm,
           characterWidth,
+          dotDensity,
           encoding,
           cutAfterPrint ? 1 : 0,
           feedLinesAfterPrint,
@@ -413,11 +599,21 @@ export function createDatabaseStore(databasePath) {
       return store.getPrinter(id)
     },
 
-    listInvoices() {
-      return database
-        .prepare('SELECT * FROM invoices ORDER BY created_at DESC')
-        .all()
-        .map((row) => mapInvoice(row))
+    listInvoices({ page = 1, pageSize = DEFAULT_PAGE_SIZE, search = '' } = {}) {
+      const limit = Math.min(Math.max(Number(pageSize) || DEFAULT_PAGE_SIZE, 1), 100)
+      const offset = (Math.max(Number(page) || 1, 1) - 1) * limit
+      const query = String(search ?? '').trim()
+      const filter = query
+        ? 'WHERE instr(lower(invoice_number), lower(?)) > 0 OR instr(lower(tracking_number), lower(?)) > 0 OR instr(lower(destination_city), lower(?)) > 0 OR instr(lower(destination_state), lower(?)) > 0 OR instr(lower(destination_zip), lower(?)) > 0'
+        : ''
+      const params = query ? [query, query, query, query, query] : []
+      const total = database
+        .prepare(`SELECT COUNT(*) AS count FROM invoices ${filter}`)
+        .get(...params).count
+      const rows = database
+        .prepare(`SELECT * FROM invoices ${filter} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+        .all(...params, limit, offset)
+      return { rows: rows.map((row) => mapInvoice(row)), total }
     },
 
     getInvoice(id) {
@@ -449,8 +645,8 @@ export function createDatabaseStore(databasePath) {
         return { id: itemId, position, description, quantityMilli, unitPrice, lineTotal }
       })
       const subtotal = normalizedItems.reduce((sum, item) => sum + item.lineTotal, 0)
-      const insurance = nonNegativeInteger(input?.insurance ?? 0, 'Insurance')
-      const total = subtotal + insurance
+      const insurance = 0
+      const total = subtotal
       const existing = store.getInvoice(id)
       const timestamp = now()
 
@@ -460,9 +656,16 @@ export function createDatabaseStore(databasePath) {
             `INSERT INTO invoices
                (id, invoice_number, invoice_date, invoice_time, customer_name, customer_phone,
                 customer_email, customer_address, currency, subtotal, insurance, total,
-                shipping_service, destination_address, package_weight, expected_delivery_date,
-                tracking_number, notes, print_status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                shipping_service, destination_city, destination_state, destination_zip,
+                package_weight, expected_delivery_date, tracking_number,
+                sender_name, sender_street, sender_city, sender_state, sender_zip, sender_contact,
+                insurance_label, notes, print_status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?,
+                     ?, ?, ?, ?, ?,
+                     ?, ?, ?, ?, ?,
+                     ?, ?, ?, ?, ?,
+                     ?, ?, ?, ?, ?,
+                     ?, ?, ?, ?, ?)
              ON CONFLICT(id) DO UPDATE SET
                invoice_number = excluded.invoice_number,
                invoice_date = excluded.invoice_date,
@@ -476,10 +679,19 @@ export function createDatabaseStore(databasePath) {
                insurance = excluded.insurance,
                total = excluded.total,
                shipping_service = excluded.shipping_service,
-               destination_address = excluded.destination_address,
+               destination_city = excluded.destination_city,
+               destination_state = excluded.destination_state,
+               destination_zip = excluded.destination_zip,
                package_weight = excluded.package_weight,
                expected_delivery_date = excluded.expected_delivery_date,
                tracking_number = excluded.tracking_number,
+               sender_name = excluded.sender_name,
+               sender_street = excluded.sender_street,
+               sender_city = excluded.sender_city,
+               sender_state = excluded.sender_state,
+               sender_zip = excluded.sender_zip,
+               sender_contact = excluded.sender_contact,
+               insurance_label = excluded.insurance_label,
                notes = excluded.notes,
                print_status = excluded.print_status,
                updated_at = excluded.updated_at`
@@ -498,12 +710,21 @@ export function createDatabaseStore(databasePath) {
             insurance,
             total,
             optionalText(input?.shippingService, 'Shipping service'),
-            optionalText(input?.destinationAddress, 'Destination address'),
+            optionalText(input?.destinationCity, 'Destination city'),
+            optionalText(input?.destinationState, 'Destination state'),
+            optionalText(input?.destinationZip, 'Destination ZIP'),
             optionalText(input?.packageWeight, 'Package weight'),
             input?.expectedDeliveryDate
               ? optionalText(input.expectedDeliveryDate, 'Expected delivery date')
               : null,
             optionalText(input?.trackingNumber, 'Tracking number'),
+            optionalText(input?.senderName, 'Sender name'),
+            optionalText(input?.senderStreet, 'Sender street'),
+            optionalText(input?.senderCity, 'Sender city'),
+            optionalText(input?.senderState, 'Sender state'),
+            optionalText(input?.senderZip, 'Sender ZIP'),
+            optionalText(input?.senderContact, 'Sender contact'),
+            optionalText(input?.insuranceLabel, 'Insurance label'),
             optionalText(input?.notes, 'Invoice notes'),
             existing?.printStatus ?? 'not_printed',
             existing?.createdAt ?? timestamp,
@@ -536,14 +757,28 @@ export function createDatabaseStore(databasePath) {
       return database.prepare('DELETE FROM invoices WHERE id = ?').run(id).changes > 0
     },
 
+    setInvoicePrintStatus(id, status) {
+      const invoiceId = requiredText(id, 'Invoice id')
+      return updateInvoicePrintStatus(database, invoiceId, status)
+    },
+
+    failInterruptedPrints() {
+      return database
+        .prepare(
+          `UPDATE invoices SET print_status = 'failed', updated_at = ?
+             WHERE print_status = 'printing'`
+        )
+        .run(now()).changes
+    },
+
     addPrintHistory(input) {
       const id = requiredText(input?.id, 'Print history id')
       const invoiceId = input?.invoiceId ? requiredText(input.invoiceId, 'Invoice id') : null
       const printerId = input?.printerId ? optionalText(input.printerId, 'Printer id') : null
       const printerName = requiredText(input?.printerName, 'Printer name')
       const connectionMethod = requiredText(input?.connectionMethod, 'Connection method')
-      if (!['network', 'system'].includes(connectionMethod)) {
-        throw new Error('Connection method must be network or system')
+      if (!['network', 'system', 'usb'].includes(connectionMethod)) {
+        throw new Error('Connection method must be network, system or usb')
       }
       const status = requiredText(input?.status, 'Print status')
       if (!['succeeded', 'failed'].includes(status)) {
@@ -570,6 +805,58 @@ export function createDatabaseStore(databasePath) {
           errorMessage,
           printedAt
         )
+
+      return {
+        id,
+        invoiceId,
+        printerId,
+        printerName,
+        connectionMethod,
+        status,
+        errorMessage,
+        printedAt
+      }
+    },
+
+    recordPrintResult(input) {
+      const id = requiredText(input?.id, 'Print history id')
+      const invoiceId = requiredText(input?.invoiceId, 'Invoice id')
+      const printerId = input?.printerId ? optionalText(input.printerId, 'Printer id') : null
+      const printerName = requiredText(input?.printerName, 'Printer name')
+      const connectionMethod = requiredText(input?.connectionMethod, 'Connection method')
+      if (!['network', 'system', 'usb'].includes(connectionMethod)) {
+        throw new Error('Connection method must be network, system or usb')
+      }
+      const status = requiredText(input?.status, 'Print status')
+      if (!['succeeded', 'failed'].includes(status)) {
+        throw new Error('Print status must be succeeded or failed')
+      }
+      const errorMessage = input?.errorMessage
+        ? optionalText(input.errorMessage, 'Error message')
+        : null
+      const printedAt = now()
+
+      transaction(database, () => {
+        if (!updateInvoicePrintStatus(database, invoiceId, status, printedAt, 'printing')) {
+          throw new Error('Invoice not found')
+        }
+        database
+          .prepare(
+            `INSERT INTO print_history
+               (id, invoice_id, printer_id, printer_name, connection_method, status, error_message, printed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            id,
+            invoiceId,
+            printerId,
+            printerName,
+            connectionMethod,
+            status,
+            errorMessage,
+            printedAt
+          )
+      })
 
       return {
         id,
