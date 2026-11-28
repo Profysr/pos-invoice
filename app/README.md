@@ -102,3 +102,32 @@ Real hardware acceptance is still required before releasing LAN or USB support:
 - Verify successful printing records print history.
 
 USB support should not be advertised until USB hardware printing passes.
+
+## Releasing an update
+
+1. Bump the version in `package.json` (e.g. `1.0.0` → `1.0.1`).
+2. Build the Windows installer:
+
+   ```powershell
+   npm run dist
+   ```
+
+3. Commit, tag, and push:
+
+   ```powershell
+   git add -A
+   git commit -m "Release 1.0.1"
+   git tag v1.0.1
+   git push origin main --tags
+   ```
+
+4. Create the release at https://github.com/Profysr/pos-invoice/releases:
+   - Tag version: `v1.0.1`
+   - Attach `release/Invoice Generator Setup 1.0.1.exe` and `release/Invoice Generator Setup 1.0.1.exe.blockmap`.
+   - Set as the latest release and publish.
+
+Users on the previous version will then see **Check for updates** in Settings → Updates and can download and install the new version.
+
+## Optional: automate with GitHub Actions
+
+If you want GitHub to build and publish releases automatically on every tag push, add a `.github/workflows/release.yml` workflow file. Ask me to generate one if you'd like.

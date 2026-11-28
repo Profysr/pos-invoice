@@ -155,7 +155,6 @@
     {
       "type": "text",
       "value": "       {{shipping.trackingNumber}}",
-      "style": "b",
       "align": "left"
     },
     {
@@ -231,26 +230,31 @@
     {
       "type": "text",
       "value": "Text your tracking number to 28777 (2USPS)",
+      "size": [1.1, 1.1],
       "align": "center"
     },
     {
       "type": "text",
       "value": "to get the latest status.Standard Message",
+      "size": [1.1, 1.1],
       "align": "center"
     },
     {
       "type": "text",
       "value": "and Date Rates may apply.You may also",
+      "size": [1.1, 1.1],
       "align": "center"
     },
     {
       "type": "text",
       "value": "visit www.usps.com USPS Tracking or call",
+      "size": [1.1, 1.1],
       "align": "center"
     },
     {
       "type": "text",
       "value": "1-800-222-1811.",
+      "size": [1.1, 1.1],
       "align": "center"
     },
     {
@@ -260,26 +264,31 @@
     {
       "type": "text",
       "value": "Save this receipt as evidence of",
+      "size": [1.1, 1.1],
       "align": "center"
     },
     {
       "type": "text",
       "value": "insurance. For information on filing an",
+      "size": [1.1, 1.1],
       "align": "center"
     },
     {
       "type": "text",
       "value": "insurance claim go to",
+      "size": [1.1, 1.1],
       "align": "center"
     },
     {
       "type": "text",
       "value": "https://www.usps.com/help/claims.htm",
+      "size": [1.1, 1.1],
       "align": "center"
     },
     {
       "type": "text",
       "value": "or call 1-800-222-1811.",
+      "size": [1.1, 1.1],
       "align": "center"
     },
     {
