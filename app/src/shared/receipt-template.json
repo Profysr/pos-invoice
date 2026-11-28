@@ -199,10 +199,6 @@
       "type": "line"
     },
     {
-      "type": "newline",
-      "count": 1
-    },
-    {
       "type": "row",
       "cells": [
         {
