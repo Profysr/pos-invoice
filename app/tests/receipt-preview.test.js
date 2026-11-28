@@ -67,3 +67,39 @@ test('preview HTML and ESC/POS payload carry the same visible receipt content', 
   assert.ok(!html.includes('Prepaid Mail@'), 'marker not in preview')
   assert.ok(!payload.includes('Prepaid Mail@'), 'marker not in ESC/POS')
 })
+
+test('footer blocks emit size [2,2] then reset to [1,1] (no leaking state)', () => {
+  const { ops } = buildReceiptDocument({ receiptData: makeReceiptData(receipt), printer })
+  const sizeOps = ops.filter((op) => op.kind === 'size')
+  const boldFooter = sizeOps.filter((op) => op.width === 2 && op.height === 2)
+  const reset = sizeOps.filter((op) => op.width === 1 && op.height === 1)
+  assert.equal(boldFooter.length, 10, 'ten footer blocks request 2x magnification')
+  assert.equal(reset.length, 10, 'each footer block resets to 1x immediately after')
+  // Size resets must interleave: [2,2],[1,1] per block, never two [2,2] in a row.
+  let prev = null
+  for (const op of sizeOps) {
+    assert.notEqual(prev, op.width === 2 && op.height === 2, 'size must not stay magnified across blocks')
+    prev = op.width === 2 && op.height === 2
+  }
+})
+
+test('ESC/POS payload emits GS ! size commands for the magnified footer', async () => {
+  const bytes = await encodeReceipt(makeReceiptData(receipt), printer)
+  const payload = bytes.toString('latin1')
+  const sizeCmds = payload.match(/\x1d!/g) || []
+  assert.equal(sizeCmds.length, 20, 'ten 2x size commands plus ten resets')
+})
+
+test('preview HTML carries transform scale matching the size ops', () => {
+  const { ops, profile } = buildReceiptDocument({ receiptData: makeReceiptData(receipt), printer })
+  const html = buildReceiptPreviewHtml({ ops, profile })
+  assert.ok(html.includes('transform:scale'), 'preview applies scale for magnified footer blocks')
+})
+
+test('preview and print consume identical formatting operations (single source of truth)', () => {
+  const { ops: opsA, profile: profileA } = buildReceiptDocument({ receiptData: makeReceiptData(receipt), printer })
+  const { ops: opsB } = buildReceiptDocument({ receiptData: makeReceiptData(receipt), printer })
+  assert.deepEqual(opsA, opsB, 'deterministic ops')
+  const html = buildReceiptPreviewHtml({ ops: opsA, profile: profileA })
+  assert.ok(html.includes('Prepaid Mail'), 'preview renders the same document printed')
+})
