@@ -9,5 +9,7 @@ contextBridge.exposeInMainWorld('invoiceApi', {
   listInvoices: (options) => ipcRenderer.invoke('invoice:list', options),
   getInvoice: (id) => ipcRenderer.invoke('invoice:get', id),
   deleteInvoice: (id) => ipcRenderer.invoke('invoice:delete', id),
-  printInvoice: (payload) => ipcRenderer.invoke('invoice:print', payload)
+  printInvoice: (payload) => ipcRenderer.invoke('invoice:print', payload),
+  checkForUpdates: () => ipcRenderer.invoke('updates:check'),
+  downloadAndInstallUpdate: () => ipcRenderer.invoke('updates:downloadInstall')
 })

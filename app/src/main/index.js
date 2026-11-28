@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
+import updater from 'electron-updater'
+const { autoUpdater } = updater
 import icon from '../../resources/icon.png?asset'
 import { createDatabaseStore, initializeUserData } from './database.js'
 import { encodeReceipt, sendReceipt } from './receipt-printing.js'
@@ -9,6 +11,20 @@ import { createPrinterTransport, sendBytes } from './printer-transport.js'
 let database
 let paths
 let mainWindow
+
+const isProduction = process.env.NODE_ENV === 'production'
+let updateChecker = null
+
+if (isProduction) {
+  autoUpdater.autoDownload = false
+  autoUpdater.on('update-downloaded', () => {
+    autoUpdater.quitAndInstall()
+  })
+  updateChecker = {
+    check: () => autoUpdater.checkForUpdates(),
+    downloadInstall: () => autoUpdater.downloadUpdate()
+  }
+}
 
 function defaultCompany() {
   return {
@@ -95,6 +111,36 @@ function registerIpcHandlers() {
     platform: process.platform,
     databaseVersion: database.getVersion()
   }))
+
+  ipcMain.handle('updates:check', async () => {
+    if (!updateChecker) {
+      return { available: false, reason: 'Updates are only available in the installed version.' }
+    }
+    try {
+      const result = await updateChecker.check()
+      const info = result?.updateInfo
+      if (!info) return { available: false }
+      return {
+        available: true,
+        version: info.version,
+        releaseNotes: info.releaseNotes,
+        files: info.files
+      }
+    } catch (error) {
+      return {
+        available: false,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    }
+  })
+
+  ipcMain.handle('updates:downloadInstall', async () => {
+    if (!updateChecker) {
+      throw new Error('Updates are only available in the installed version.')
+    }
+    // The update-downloaded listener above calls quitAndInstall() once the download finishes.
+    await updateChecker.downloadInstall()
+  })
 
   function companyRecord() {
     return database.getCompany() || defaultCompany()

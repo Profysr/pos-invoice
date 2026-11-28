@@ -353,7 +353,7 @@ function SavedInvoicesPage({ onEdit }) {
         opened={Boolean(viewing)}
         onClose={() => setViewing(null)}
         title={viewing?.invoice?.invoiceNumber || 'Receipt'}
-        size={440}
+        size={720}
         centered
       >
         {viewing && (
